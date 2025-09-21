@@ -2,8 +2,9 @@ package nonceServices
 
 import (
 	"bytes"
-	"github.com/okuralabs/okura-node/logger"
 	"runtime/debug"
+
+	"github.com/okuralabs/okura-node/logger"
 
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
@@ -164,7 +165,7 @@ func OnMessage(addr [4]byte, m []byte) {
 		if newBlock.CheckProofOfSynergy() {
 			_, _, err := blocks.CheckBlockTransfers(newBlock, lastBlock, merkleTrie, false)
 			if err == nil {
-				services.BroadcastBlock(newBlock)
+				services.BroadcastBlock(addr, newBlock)
 			} else {
 				logger.GetLogger().Println("new block is not valid. Bad transactions included")
 			}
