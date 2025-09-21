@@ -235,7 +235,7 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 						ChanPeer <- dc
 					}
 					reconnectionTries = 0
-					continue
+					return
 				}
 				reconnectionTries++
 				time.Sleep(time.Millisecond * 10)
