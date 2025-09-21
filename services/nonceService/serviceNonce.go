@@ -2,6 +2,9 @@ package nonceServices
 
 import (
 	"bytes"
+	"context"
+	"log"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -217,18 +220,34 @@ func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
 
 func SendSelf(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexNonceSelf.TryLock() {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+
+	// Try in a goroutine with timeout
+	done := make(chan bool, 1)
+
+	go func() {
+		services.SendMutexNonceSelf.Lock()
 		defer services.SendMutexNonceSelf.Unlock()
+
 		select {
 		case services.SendChanSelfNonce <- nb:
-			return true
+			done <- true
 		default:
-			// Channel full, could purge here if needed
 			services.PurgeChannel(services.SendChanSelfNonce, 10)
-			return false
+			done <- false
 		}
+	}()
+
+	select {
+	case result := <-done:
+		return result
+	case <-ctx.Done():
+		log.Println("SendSelf timeout - possible deadlock")
+		debug.PrintStack()
+		return false
 	}
-	return false
 }
 
 func sendNonceMsg(ip [4]byte, topic [2]byte) {
@@ -252,18 +271,34 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexNonce.TryLock() {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Try in a goroutine with timeout
+	done := make(chan bool, 1)
+
+	go func() {
+		services.SendMutexNonce.Lock()
 		defer services.SendMutexNonce.Unlock()
+
 		select {
 		case services.SendChanNonce <- nb:
-			return true
+			done <- true
 		default:
-			// Channel full, could purge here if needed
 			services.PurgeChannel(services.SendChanNonce, 2)
-			return false
+			done <- false
 		}
+	}()
+
+	select {
+	case result := <-done:
+		return result
+	case <-ctx.Done():
+		log.Println("SendSelf timeout - possible deadlock")
+		debug.PrintStack()
+		return false
 	}
-	return false
 }
 
 func sendNonceMsgInLoop() {

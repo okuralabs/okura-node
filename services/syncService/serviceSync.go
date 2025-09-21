@@ -2,6 +2,9 @@ package syncServices
 
 import (
 	"bytes"
+	"context"
+	"log"
+	"runtime/debug"
 	"time"
 
 	"github.com/okuralabs/okura-node/blocks"
@@ -137,18 +140,34 @@ func SendGetHeaders(addr [4]byte, height int64) {
 
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexSync.TryLock() {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Try in a goroutine with timeout
+	done := make(chan bool, 1)
+
+	go func() {
+		services.SendMutexSync.Lock()
 		defer services.SendMutexSync.Unlock()
+
 		select {
-		case services.SendChanSync <- nb:
-			return true
+		case services.SendChanNonce <- nb:
+			done <- true
 		default:
-			// Channel full, could purge here if needed
 			services.PurgeChannel(services.SendChanSync, 10)
-			return false
+			done <- false
 		}
+	}()
+
+	select {
+	case result := <-done:
+		return result
+	case <-ctx.Done():
+		log.Println("SendSelf timeout - possible deadlock")
+		debug.PrintStack()
+		return false
 	}
-	return false
 }
 
 func sendSyncMsgInLoop() {
