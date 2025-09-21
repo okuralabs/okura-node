@@ -14,7 +14,7 @@ import (
 
 func InitSyncService() {
 	services.SendMutexSync.Lock()
-	services.SendChanSync = make(chan []byte, 3)
+	services.SendChanSync = make(chan []byte, 5)
 
 	services.SendMutexSync.Unlock()
 	startPublishingSyncMsg()

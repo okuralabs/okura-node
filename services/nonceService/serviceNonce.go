@@ -77,10 +77,10 @@ func InitChannelVoting(voteChan chan []byte) {
 
 func InitNonceService() {
 	services.SendMutexNonce.Lock()
-	services.SendChanNonce = make(chan []byte, 3)
+	services.SendChanNonce = make(chan []byte, 5)
 	services.SendMutexNonce.Unlock()
 	services.SendMutexNonceSelf.Lock()
-	services.SendChanSelfNonce = make(chan []byte, 3)
+	services.SendChanSelfNonce = make(chan []byte, 5)
 	services.SendMutexNonceSelf.Unlock()
 	startPublishingNonceMsg()
 	time.Sleep(time.Second)
