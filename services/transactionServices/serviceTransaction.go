@@ -132,7 +132,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		defer services.SendMutexTx.Unlock()
 
 		select {
-		case services.SendChanNonce <- nb:
+		case services.SendChanTx <- nb:
 			done <- true
 		default:
 			services.PurgeChannel(services.SendChanTx, 3)
