@@ -141,7 +141,7 @@ func SendGetHeaders(addr [4]byte, height int64) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
 
 	// Try in a goroutine with timeout
@@ -155,7 +155,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanSync <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanSync, 2)
+			services.PurgeChannel(services.SendChanSync, 10)
 			done <- false
 		}
 	}()
@@ -164,7 +164,7 @@ func Send(addr [4]byte, nb []byte) bool {
 	case result := <-done:
 		return result
 	case <-ctx.Done():
-		log.Println("SendSelf timeout - possible deadlock")
+		log.Println("Sync timeout - possible deadlock")
 		debug.PrintStack()
 		return false
 	}

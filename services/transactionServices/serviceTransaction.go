@@ -121,7 +121,7 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
 	// Try in a goroutine with timeout
@@ -135,7 +135,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanTx <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanTx, 3)
+			services.PurgeChannel(services.SendChanTx, 10)
 			done <- false
 		}
 	}()
@@ -144,7 +144,7 @@ func Send(addr [4]byte, nb []byte) bool {
 	case result := <-done:
 		return result
 	case <-ctx.Done():
-		log.Println("SendSelf timeout - possible deadlock")
+		log.Println("transaction timeout - possible deadlock")
 		debug.PrintStack()
 		return false
 	}
