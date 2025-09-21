@@ -17,7 +17,7 @@ import (
 
 func InitTransactionService() {
 	services.SendMutexTx.Lock()
-	services.SendChanTx = make(chan []byte, 100)
+	services.SendChanTx = make(chan []byte, 3)
 
 	services.SendMutexTx.Unlock()
 	startPublishingTransactionMsg()
