@@ -199,7 +199,7 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 
 	for {
 		resetNumber++
-		if resetNumber%100 == 0 {
+		if resetNumber%1000 == 0 {
 			reconnectionTries = 0
 		}
 
@@ -220,11 +220,19 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 			}
 			if bytes.Equal(r, []byte("<-ERR->")) {
 				if reconnectionTries > common.ConnectionMaxTries {
-					logger.GetLogger().Println("error in read. Closing connection", ip, string(r))
-					tcpConn.Close()
-					tcpConn, err = net.DialTCP("tcp", nil, tcpAddr)
-					if err != nil {
-						logger.GetLogger().Printf("Connection attempt %d to %s failed: %v", ipport, err.Error())
+					//logger.GetLogger().Println("error in read. Closing connection", ip, string(r))
+					//tcpConn.Close()
+					//tcpConn, err = net.DialTCP("tcp", nil, tcpAddr)
+					//if err != nil {
+					//	logger.GetLogger().Printf("Connection attempt %d to %s failed: %v", ipport, err.Error())
+					//}
+					logger.GetLogger().Println("Closing connection", ip, r)
+					PeersMutex.Lock()
+					receiveChan <- []byte("EXIT")
+					deletedIP := CloseAndRemoveConnection(tcpConn)
+					PeersMutex.Unlock()
+					for _, dc := range deletedIP {
+						ChanPeer <- dc
 					}
 					reconnectionTries = 0
 					continue
