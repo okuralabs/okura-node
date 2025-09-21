@@ -13,7 +13,7 @@ import (
 var QUIT = atomic.Bool{}
 
 func PurgeChannel(ch chan []byte) {
-	for {
+	for range 2 {
 		select {
 		case <-ch:
 			// Discard the message
