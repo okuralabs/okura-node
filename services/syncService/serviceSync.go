@@ -2,13 +2,14 @@ package syncServices
 
 import (
 	"bytes"
+	"time"
+
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/message"
 	"github.com/okuralabs/okura-node/services"
 	"github.com/okuralabs/okura-node/tcpip"
-	"time"
 )
 
 func InitSyncService() {
@@ -141,6 +142,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanSync <- nb
 		return true
 	}
+	services.PurgeChannel(services.SendChanSync)
 	return false
 }
 

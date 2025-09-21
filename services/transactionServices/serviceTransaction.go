@@ -2,9 +2,10 @@ package transactionServices
 
 import (
 	"bytes"
-	"github.com/okuralabs/okura-node/logger"
 	"math/rand"
 	"time"
+
+	"github.com/okuralabs/okura-node/logger"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/message"
@@ -122,6 +123,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanTx <- nb
 		return true
 	}
+	services.PurgeChannel(services.SendChanTx)
 	return false
 }
 

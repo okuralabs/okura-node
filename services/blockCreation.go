@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"sync"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
@@ -14,7 +16,6 @@ import (
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/transactionsPool"
 	"github.com/okuralabs/okura-node/wallet"
-	"sync"
 )
 
 var (
