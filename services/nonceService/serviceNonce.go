@@ -2,6 +2,9 @@ package nonceServices
 
 import (
 	"bytes"
+	"sync"
+	"time"
+
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -13,8 +16,6 @@ import (
 	"github.com/okuralabs/okura-node/voting"
 	"github.com/okuralabs/okura-node/wallet"
 	"golang.org/x/exp/rand"
-	"sync"
-	"time"
 )
 
 var LastRepliedIP [4]byte
@@ -220,6 +221,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanNonce <- nb
 		return true
 	}
+	services.PurgeChannel(services.SendChanNonce)
 	return false
 }
 
