@@ -78,9 +78,10 @@ func InitChannelVoting(voteChan chan []byte) {
 func InitNonceService() {
 	services.SendMutexNonce.Lock()
 	services.SendChanNonce = make(chan []byte, 3)
-
-	services.SendChanSelfNonce = make(chan []byte, 3)
 	services.SendMutexNonce.Unlock()
+	services.SendMutexNonceSelf.Lock()
+	services.SendChanSelfNonce = make(chan []byte, 3)
+	services.SendMutexNonceSelf.Unlock()
 	startPublishingNonceMsg()
 	time.Sleep(time.Second)
 	go sendNonceMsgInLoop()
@@ -216,8 +217,8 @@ func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
 
 func SendSelf(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexNonce.TryLock() {
-		defer services.SendMutexNonce.Unlock()
+	if services.SendMutexNonceSelf.TryLock() {
+		defer services.SendMutexNonceSelf.Unlock()
 		services.SendChanSelfNonce <- nb
 		return true
 	}

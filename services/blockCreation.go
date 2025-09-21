@@ -19,13 +19,14 @@ import (
 )
 
 var (
-	SendChanNonce     chan []byte
-	SendChanSelfNonce chan []byte
-	SendMutexNonce    sync.RWMutex
-	SendChanTx        chan []byte
-	SendMutexTx       sync.RWMutex
-	SendChanSync      chan []byte
-	SendMutexSync     sync.RWMutex
+	SendChanNonce      chan []byte
+	SendChanSelfNonce  chan []byte
+	SendMutexNonce     sync.RWMutex
+	SendMutexNonceSelf sync.RWMutex
+	SendChanTx         chan []byte
+	SendMutexTx        sync.RWMutex
+	SendChanSync       chan []byte
+	SendMutexSync      sync.RWMutex
 )
 
 func CreateBlockFromNonceMessage(nonceTx []transactionsDefinition.Transaction,
@@ -161,12 +162,13 @@ func GenerateBlockMessage(bl blocks.Block) message.TransactionsMessage {
 
 func SendNonce(ip [4]byte, nb []byte) {
 	nb = append(ip[:], nb...)
-	SendMutexNonce.Lock()
-	SendChanNonce <- nb
-	SendMutexNonce.Unlock()
+	if SendMutexNonce.TryLock() {
+		SendChanNonce <- nb
+		SendMutexNonce.Unlock()
+	}
 }
 
-func BroadcastBlock(bl blocks.Block) {
+func BroadcastBlock(ignoreAddr [4]byte, bl blocks.Block) {
 	atm := GenerateBlockMessage(bl)
 	nb := atm.GetBytes()
 	var ip [4]byte
