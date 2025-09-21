@@ -3,10 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
-	"github.com/therecipe/qt/widgets"
 	rand2 "math/rand"
 	"sync"
+
+	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
+	"github.com/therecipe/qt/widgets"
+
+	"os"
+	"time"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -15,8 +19,6 @@ import (
 	"github.com/okuralabs/okura-node/statistics"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/wallet"
-	"os"
-	"time"
 )
 
 var mutex sync.Mutex
@@ -43,7 +45,7 @@ func main() {
 	wallet.InitActiveWallet(0, string(password), sigName, sigName2)
 	MainWallet = wallet.GetActiveWallet()
 
-	for range 2 {
+	for range 10 {
 		go sendTransactions(MainWallet)
 		//time.Sleep(time.Millisecond * 1)
 	}
@@ -159,7 +161,7 @@ func sendTransactions(w *wallet.Wallet) {
 	batchSize := 1
 	count := int64(0)
 	start := common.GetCurrentTimeStampInSecond()
-	for range time.Tick(time.Millisecond * 1000) {
+	for range time.Tick(time.Millisecond * 10) {
 		var txs []transactionsDefinition.Transaction
 		for i := 0; i < batchSize; i++ {
 			tx := SampleTransaction(w)
