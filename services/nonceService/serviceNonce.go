@@ -77,9 +77,9 @@ func InitChannelVoting(voteChan chan []byte) {
 
 func InitNonceService() {
 	services.SendMutexNonce.Lock()
-	services.SendChanNonce = make(chan []byte, 10)
+	services.SendChanNonce = make(chan []byte, 3)
 
-	services.SendChanSelfNonce = make(chan []byte, 10)
+	services.SendChanSelfNonce = make(chan []byte, 3)
 	services.SendMutexNonce.Unlock()
 	startPublishingNonceMsg()
 	time.Sleep(time.Second)
@@ -178,7 +178,7 @@ func sendNonceMsgInLoopSelf(chanRecv chan []byte) {
 	var topic = [2]byte{'S', 'S'}
 Q:
 	for range time.Tick(time.Second) {
-		sendNonceMsg(tcpip.MyIP, topic)
+		sendSelfNonceMsg(tcpip.MyIP, topic)
 		timeout := time.After(time.Second)
 
 		select {
@@ -193,6 +193,36 @@ Q:
 			break
 		}
 	}
+}
+
+func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
+	h := common.GetHeight()
+	if h < common.CurrentHeightOfNetwork {
+		return
+	}
+	//isync := common.IsSyncing.Load()
+	//if isync == true {
+	//	return
+	//}
+	n, err := generateNonceMsg(topic)
+	if err != nil {
+		logger.GetLogger().Println(err)
+		return
+	}
+	if !SendSelf(ip, n.GetBytes()) {
+		logger.GetLogger().Println("could not send nonce message")
+	}
+}
+
+func SendSelf(addr [4]byte, nb []byte) bool {
+	nb = append(addr[:], nb...)
+	if services.SendMutexNonce.TryLock() {
+		defer services.SendMutexNonce.Unlock()
+		services.SendChanSelfNonce <- nb
+		return true
+	}
+	services.PurgeChannel(services.SendChanSelfNonce)
+	return false
 }
 
 func sendNonceMsg(ip [4]byte, topic [2]byte) {
