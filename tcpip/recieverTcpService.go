@@ -212,7 +212,7 @@ func Receive(topic [2]byte, conn *net.TCPConn) []byte {
 		//if err == io.EOF {
 		//	return []byte("<-CLS->")
 		//}
-		logger.GetLogger().Println("n=", n, "err", err.Error())
+		//logger.GetLogger().Println("n=", n, "err", err.Error())
 		//handleConnectionError(err, topic, conn)
 		return []byte("<-ERR->")
 	}
