@@ -286,7 +286,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanNonce <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanNonce, 2)
+			services.PurgeChannel(services.SendChanNonce, 10)
 			done <- false
 		}
 	}()
