@@ -142,7 +142,8 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanSync <- nb
 		return true
 	}
-	services.PurgeChannel(services.SendChanSync, 10)
+	services.SendMutexSync.Unlock()
+	services.PurgeChannel(services.SendChanSync, &services.SendMutexSync, 10)
 	return false
 }
 

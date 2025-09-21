@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/okuralabs/okura-node/account"
@@ -12,7 +13,10 @@ import (
 
 var QUIT = atomic.Bool{}
 
-func PurgeChannel(ch chan []byte, count int) {
+func PurgeChannel(ch chan []byte, mutex *sync.RWMutex, count int) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+	logger.GetLogger().Println("Purging channel")
 	for range count {
 		select {
 		case <-ch:

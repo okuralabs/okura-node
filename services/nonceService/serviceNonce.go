@@ -222,7 +222,8 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 		services.SendChanSelfNonce <- nb
 		return true
 	}
-	services.PurgeChannel(services.SendChanSelfNonce, 10)
+	services.SendMutexNonceSelf.Unlock()
+	services.PurgeChannel(services.SendChanSelfNonce, &services.SendMutexNonceSelf, 10)
 	return false
 }
 
@@ -252,7 +253,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanNonce <- nb
 		return true
 	}
-	services.PurgeChannel(services.SendChanNonce, 2)
+	services.PurgeChannel(services.SendChanNonce, &services.SendMutexNonce, 2)
 	return false
 }
 

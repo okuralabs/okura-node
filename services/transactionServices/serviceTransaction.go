@@ -123,7 +123,8 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanTx <- nb
 		return true
 	}
-	services.PurgeChannel(services.SendChanTx, 3)
+	services.SendMutexTx.Unlock()
+	services.PurgeChannel(services.SendChanTx, &services.SendMutexTx, 3)
 	return false
 }
 
