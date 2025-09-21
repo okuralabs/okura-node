@@ -219,11 +219,15 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 	if services.SendMutexNonceSelf.TryLock() {
 		defer services.SendMutexNonceSelf.Unlock()
-		services.SendChanSelfNonce <- nb
-		return true
+		select {
+		case services.SendChanSelfNonce <- nb:
+			return true
+		default:
+			// Channel full, could purge here if needed
+			services.PurgeChannel(services.SendChanSelfNonce, 10)
+			return false
+		}
 	}
-	services.SendMutexNonceSelf.Unlock()
-	services.PurgeChannel(services.SendChanSelfNonce, &services.SendMutexNonceSelf, 10)
 	return false
 }
 
@@ -250,10 +254,15 @@ func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 	if services.SendMutexNonce.TryLock() {
 		defer services.SendMutexNonce.Unlock()
-		services.SendChanNonce <- nb
-		return true
+		select {
+		case services.SendChanNonce <- nb:
+			return true
+		default:
+			// Channel full, could purge here if needed
+			services.PurgeChannel(services.SendChanNonce, 2)
+			return false
+		}
 	}
-	services.PurgeChannel(services.SendChanNonce, &services.SendMutexNonce, 2)
 	return false
 }
 

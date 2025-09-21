@@ -120,11 +120,16 @@ func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 	if services.SendMutexTx.TryLock() {
 		defer services.SendMutexTx.Unlock()
-		services.SendChanTx <- nb
-		return true
+		select {
+		case services.SendChanTx <- nb:
+			return true
+		default:
+			// Channel full, could purge here if needed
+			services.PurgeChannel(services.SendChanTx, 3)
+			return false
+		}
 	}
-	services.SendMutexTx.Unlock()
-	services.PurgeChannel(services.SendChanTx, &services.SendMutexTx, 3)
+
 	return false
 }
 
