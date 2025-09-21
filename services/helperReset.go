@@ -12,8 +12,8 @@ import (
 
 var QUIT = atomic.Bool{}
 
-func PurgeChannel(ch chan []byte) {
-	for range 2 {
+func PurgeChannel(ch chan []byte, count int) {
+	for range count {
 		select {
 		case <-ch:
 			// Discard the message

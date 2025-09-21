@@ -142,7 +142,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		services.SendChanSync <- nb
 		return true
 	}
-	services.PurgeChannel(services.SendChanSync)
+	services.PurgeChannel(services.SendChanSync, 10)
 	return false
 }
 
