@@ -20,9 +20,9 @@ Install RocksDB:
 
     git clone https://github.com/facebook/rocksdb.git
     cd rocksdb
-    git checkout v10.2.1
-    make static_lib
-    sudo make install-static
+    git checkout v10.2.4
+    make shared_lib
+    sudo make install-shared
     sudo ldconfig
 
 Install OQS library:
