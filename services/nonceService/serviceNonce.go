@@ -272,7 +272,7 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
 
 	// Try in a goroutine with timeout
