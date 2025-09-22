@@ -235,7 +235,7 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 		case services.SendChanSelfNonce <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanSelfNonce, 10)
+			services.PurgeChannel(services.SendChanSelfNonce, 5)
 			done <- false
 		}
 	}()
@@ -286,7 +286,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanNonce <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanNonce, 10)
+			services.PurgeChannel(services.SendChanNonce, 5)
 			done <- false
 		}
 	}()

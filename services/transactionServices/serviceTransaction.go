@@ -135,7 +135,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanTx <- nb:
 			done <- true
 		default:
-			services.PurgeChannel(services.SendChanTx, 10)
+			services.PurgeChannel(services.SendChanTx, 5)
 			done <- false
 		}
 	}()
