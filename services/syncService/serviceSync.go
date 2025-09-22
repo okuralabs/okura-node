@@ -152,6 +152,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		if atomic.LoadInt32(&lockHeldSync) == 1 {
 			// Timeout already fired, unlock and exit
 			services.SendMutexSync.Unlock()
+
 			return
 		}
 
@@ -172,16 +173,18 @@ func Send(addr [4]byte, nb []byte) bool {
 	case <-timeoutChan:
 		atomic.StoreInt32(&lockHeldSync, 1) // Signal timeout occurred
 		log.Println("Failed to acquire lock within timeout")
+		time.Sleep(time.Millisecond * 2000)
 		return false
 	}
 }
 
 func sendSyncMsgInLoop() {
-	for range time.Tick(time.Second) {
+	for {
 		n := generateSyncMsgHeight()
 		if !Send([4]byte{0, 0, 0, 0}, n) {
 			logger.GetLogger().Println("could not send 'hi' message")
 		}
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 

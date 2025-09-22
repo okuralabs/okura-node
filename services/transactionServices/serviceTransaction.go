@@ -132,6 +132,7 @@ func Send(addr [4]byte, nb []byte) bool {
 		if atomic.LoadInt32(&lockHeldTx) == 1 {
 			// Timeout already fired, unlock and exit
 			services.SendMutexTx.Unlock()
+			time.Sleep(time.Millisecond * 2000)
 			return
 		}
 
@@ -152,6 +153,7 @@ func Send(addr [4]byte, nb []byte) bool {
 	case <-timeoutChan:
 		atomic.StoreInt32(&lockHeldTx, 1) // Signal timeout occurred
 		log.Println("Failed to acquire lock within timeout")
+		time.Sleep(time.Millisecond * 2000)
 		return false
 	}
 }
