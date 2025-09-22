@@ -180,7 +180,7 @@ func generateNonceMsg(topic [2]byte) (message.TransactionsMessage, error) {
 func sendNonceMsgInLoopSelf(chanRecv chan []byte) {
 	var topic = [2]byte{'S', 'S'}
 Q:
-	for range time.Tick(time.Second) {
+	for {
 		sendSelfNonceMsg(tcpip.MyIP, topic)
 		timeout := time.After(time.Second)
 
@@ -195,6 +195,7 @@ Q:
 			// You can break the loop or return from the function here
 			break
 		}
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 
@@ -272,6 +273,7 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	}
 	if !Send(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send nonce message")
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 
@@ -315,9 +317,10 @@ func Send(addr [4]byte, nb []byte) bool {
 }
 
 func sendNonceMsgInLoop() {
-	for range time.Tick(time.Second * 5) {
+	for {
 		var topic = [2]byte{'N', 'N'}
 		sendNonceMsg([4]byte{0, 0, 0, 0}, topic)
+		time.Sleep(time.Millisecond * 5000)
 	}
 }
 
