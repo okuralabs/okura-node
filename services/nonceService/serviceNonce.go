@@ -226,11 +226,9 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 
 	// Try in a goroutine with timeout
 	done := make(chan bool, 1)
-
+	services.SendMutexNonceSelf.Lock()
+	defer services.SendMutexNonceSelf.Unlock()
 	go func() {
-		services.SendMutexNonceSelf.Lock()
-		defer services.SendMutexNonceSelf.Unlock()
-
 		select {
 		case services.SendChanSelfNonce <- nb:
 			done <- true
