@@ -2,9 +2,9 @@ package transactionServices
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"math/rand"
-	"sync/atomic"
 	"time"
 
 	"github.com/okuralabs/okura-node/logger"
@@ -117,26 +117,25 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 	}
 }
 
-var lockHeldTx int32 // atomic flag
-
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
 	lockChan := make(chan struct{}, 1)
-	timeoutChan := time.After(1000 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
 
 	go func() {
 		services.SendMutexTx.Lock()
 
-		// Atomically check if timeout occurred
-		if atomic.LoadInt32(&lockHeldTx) == 1 {
-			// Timeout already fired, unlock and exit
+		// Check if context is still valid
+		select {
+		case <-ctx.Done():
+			// Timeout occurred, we need to unlock and exit
 			services.SendMutexTx.Unlock()
-			time.Sleep(time.Millisecond * 2000)
 			return
+		case lockChan <- struct{}{}:
+			// Successfully notified, don't unlock here
 		}
-
-		lockChan <- struct{}{}
 	}()
 
 	select {
@@ -147,13 +146,12 @@ func Send(addr [4]byte, nb []byte) bool {
 		case services.SendChanTx <- nb:
 			return true
 		default:
-			services.PurgeChannel(services.SendChanTx, 5)
+			//services.PurgeChannel(services.SendChanTx, 3)
 			return false
 		}
-	case <-timeoutChan:
-		atomic.StoreInt32(&lockHeldTx, 1) // Signal timeout occurred
+	case <-ctx.Done():
 		log.Println("Failed to acquire lock within timeout")
-		time.Sleep(time.Millisecond * 2000)
+		// The goroutine will handle unlocking if it got the lock
 		return false
 	}
 }
@@ -172,6 +170,7 @@ func BroadcastTxn(ignoreAddr [4]byte, nb []byte) {
 			//logger.GetLogger().Println("send transactions to ", int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
 			if !Send(ip, nb) {
 				logger.GetLogger().Println("could not broadcast transaction")
+				time.Sleep(time.Millisecond * 2000)
 			}
 		}
 	}
