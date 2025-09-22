@@ -121,16 +121,14 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
 
 	// Try in a goroutine with timeout
 	done := make(chan bool, 1)
-
+	services.SendMutexTx.Lock()
+	defer services.SendMutexTx.Unlock()
 	go func() {
-		services.SendMutexTx.Lock()
-		defer services.SendMutexTx.Unlock()
-
 		select {
 		case services.SendChanTx <- nb:
 			done <- true
