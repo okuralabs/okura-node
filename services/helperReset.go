@@ -20,7 +20,6 @@ func PurgeChannel(ch chan []byte, count int) {
 			// Discard the message
 		default:
 			// Channel is empty, done purging
-			logger.GetLogger().Panicln("channel purged")
 			return
 		}
 	}
