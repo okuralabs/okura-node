@@ -2,9 +2,8 @@ package syncServices
 
 import (
 	"bytes"
-	"context"
 	"log"
-	"runtime/debug"
+	"sync/atomic"
 	"time"
 
 	"github.com/okuralabs/okura-node/blocks"
@@ -138,33 +137,41 @@ func SendGetHeaders(addr [4]byte, height int64) {
 	}
 }
 
+var lockHeldSync int32 // atomic flag
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
+	lockChan := make(chan struct{}, 1)
+	timeoutChan := time.After(1000 * time.Millisecond)
 
-	// Try in a goroutine with timeout
-	done := make(chan bool, 1)
-
-	services.SendMutexSync.Lock()
-	defer services.SendMutexSync.Unlock()
 	go func() {
-		select {
-		case services.SendChanSync <- nb:
-			done <- true
-		default:
-			services.PurgeChannel(services.SendChanSync, 5)
-			done <- false
+		services.SendMutexSync.Lock()
+
+		// Atomically check if timeout occurred
+		if atomic.LoadInt32(&lockHeldSync) == 1 {
+			// Timeout already fired, unlock and exit
+			services.SendMutexSync.Unlock()
+			return
 		}
+
+		lockChan <- struct{}{}
 	}()
 
 	select {
-	case result := <-done:
-		return result
-	case <-ctx.Done():
-		log.Println("Sync timeout - possible deadlock")
-		debug.PrintStack()
+	case <-lockChan:
+		defer services.SendMutexSync.Unlock()
+
+		select {
+		case services.SendChanSync <- nb:
+			return true
+		default:
+			services.PurgeChannel(services.SendChanSync, 5)
+			return false
+		}
+	case <-timeoutChan:
+		atomic.StoreInt32(&lockHeldSync, 1) // Signal timeout occurred
+		log.Println("Failed to acquire lock within timeout")
 		return false
 	}
 }

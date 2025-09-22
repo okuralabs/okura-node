@@ -2,10 +2,9 @@ package transactionServices
 
 import (
 	"bytes"
-	"context"
 	"log"
 	"math/rand"
-	"runtime/debug"
+	"sync/atomic"
 	"time"
 
 	"github.com/okuralabs/okura-node/logger"
@@ -118,32 +117,41 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 	}
 }
 
+var lockHeldTx int32 // atomic flag
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
+	lockChan := make(chan struct{}, 1)
+	timeoutChan := time.After(1000 * time.Millisecond)
 
-	// Try in a goroutine with timeout
-	done := make(chan bool, 1)
-	services.SendMutexTx.Lock()
-	defer services.SendMutexTx.Unlock()
 	go func() {
-		select {
-		case services.SendChanTx <- nb:
-			done <- true
-		default:
-			services.PurgeChannel(services.SendChanTx, 5)
-			done <- false
+		services.SendMutexTx.Lock()
+
+		// Atomically check if timeout occurred
+		if atomic.LoadInt32(&lockHeldTx) == 1 {
+			// Timeout already fired, unlock and exit
+			services.SendMutexTx.Unlock()
+			return
 		}
+
+		lockChan <- struct{}{}
 	}()
 
 	select {
-	case result := <-done:
-		return result
-	case <-ctx.Done():
-		log.Println("transaction timeout - possible deadlock")
-		debug.PrintStack()
+	case <-lockChan:
+		defer services.SendMutexTx.Unlock()
+
+		select {
+		case services.SendChanTx <- nb:
+			return true
+		default:
+			services.PurgeChannel(services.SendChanTx, 5)
+			return false
+		}
+	case <-timeoutChan:
+		atomic.StoreInt32(&lockHeldTx, 1) // Signal timeout occurred
+		log.Println("Failed to acquire lock within timeout")
 		return false
 	}
 }

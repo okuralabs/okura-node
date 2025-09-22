@@ -2,10 +2,9 @@ package nonceServices
 
 import (
 	"bytes"
-	"context"
 	"log"
-	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/okuralabs/okura-node/blocks"
@@ -218,32 +217,41 @@ func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
 	}
 }
 
+var lockHeldSelf int32 // atomic flag
+
 func SendSelf(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
+	lockChan := make(chan struct{}, 1)
+	timeoutChan := time.After(1000 * time.Millisecond)
 
-	// Try in a goroutine with timeout
-	done := make(chan bool, 1)
-	services.SendMutexNonceSelf.Lock()
-	defer services.SendMutexNonceSelf.Unlock()
 	go func() {
-		select {
-		case services.SendChanSelfNonce <- nb:
-			done <- true
-		default:
-			services.PurgeChannel(services.SendChanSelfNonce, 5)
-			done <- false
+		services.SendMutexNonceSelf.Lock()
+
+		// Atomically check if timeout occurred
+		if atomic.LoadInt32(&lockHeldSelf) == 1 {
+			// Timeout already fired, unlock and exit
+			services.SendMutexNonceSelf.Unlock()
+			return
 		}
+
+		lockChan <- struct{}{}
 	}()
 
 	select {
-	case result := <-done:
-		return result
-	case <-ctx.Done():
-		log.Println("SendSelf timeout - possible deadlock")
-		debug.PrintStack()
+	case <-lockChan:
+		defer services.SendMutexNonceSelf.Unlock()
+
+		select {
+		case services.SendChanSelfNonce <- nb:
+			return true
+		default:
+			services.PurgeChannel(services.SendChanSelfNonce, 5)
+			return false
+		}
+	case <-timeoutChan:
+		atomic.StoreInt32(&lockHeldSelf, 1) // Signal timeout occurred
+		log.Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
@@ -267,32 +275,41 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	}
 }
 
+var lockHeldNonce int32 // atomic flag
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
+	lockChan := make(chan struct{}, 1)
+	timeoutChan := time.After(1000 * time.Millisecond)
 
-	// Try in a goroutine with timeout
-	done := make(chan bool, 1)
-	services.SendMutexNonce.Lock()
-	defer services.SendMutexNonce.Unlock()
 	go func() {
-		select {
-		case services.SendChanNonce <- nb:
-			done <- true
-		default:
-			services.PurgeChannel(services.SendChanNonce, 5)
-			done <- false
+		services.SendMutexNonce.Lock()
+
+		// Atomically check if timeout occurred
+		if atomic.LoadInt32(&lockHeldNonce) == 1 {
+			// Timeout already fired, unlock and exit
+			services.SendMutexNonce.Unlock()
+			return
 		}
+
+		lockChan <- struct{}{}
 	}()
 
 	select {
-	case result := <-done:
-		return result
-	case <-ctx.Done():
-		log.Println("Send timeout - possible deadlock")
-		debug.PrintStack()
+	case <-lockChan:
+		defer services.SendMutexNonce.Unlock()
+
+		select {
+		case services.SendChanNonce <- nb:
+			return true
+		default:
+			services.PurgeChannel(services.SendChanNonce, 5)
+			return false
+		}
+	case <-timeoutChan:
+		atomic.StoreInt32(&lockHeldNonce, 1) // Signal timeout occurred
+		log.Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
