@@ -2,6 +2,7 @@ package services
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
@@ -14,15 +15,16 @@ var QUIT = atomic.Bool{}
 
 func PurgeChannel(ch chan []byte, count int) {
 	logger.GetLogger().Println("Purging channel")
-	for range count {
-		select {
-		case <-ch:
-			// Discard the message
-		default:
-			// Channel is empty, done purging
-			return
-		}
-	}
+	time.Sleep(time.Second * time.Duration(count))
+	//for range count {
+	//	select {
+	//	case <-ch:
+	//		// Discard the message
+	//	default:
+	//		// Channel is empty, done purging
+	//		return
+	//	}
+	//}
 }
 
 func init() {
