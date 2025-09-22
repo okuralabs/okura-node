@@ -21,9 +21,9 @@ import (
 )
 
 func OnMessage(addr [4]byte, m []byte) {
-	if common.IsSyncing.Load() {
-		return
-	}
+	//if common.IsSyncing.Load() {
+	//	return
+	//}
 
 	h := common.GetHeight()
 
