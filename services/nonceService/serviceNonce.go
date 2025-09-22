@@ -275,11 +275,9 @@ func Send(addr [4]byte, nb []byte) bool {
 
 	// Try in a goroutine with timeout
 	done := make(chan bool, 1)
-
+	services.SendMutexNonce.Lock()
+	defer services.SendMutexNonce.Unlock()
 	go func() {
-		services.SendMutexNonce.Lock()
-		defer services.SendMutexNonce.Unlock()
-
 		select {
 		case services.SendChanNonce <- nb:
 			done <- true
