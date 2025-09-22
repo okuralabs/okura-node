@@ -89,10 +89,10 @@ Q:
 }
 
 func SendTransactionMsg(ip [4]byte, topic [2]byte) bool {
-	isync := common.IsSyncing.Load()
-	if isync == true {
-		return true
-	}
+	//isync := common.IsSyncing.Load()
+	//if isync == true {
+	//	return true
+	//}
 	txs := transactionsPool.PoolsTx.PeekTransactions(int(common.MaxTransactionsPerBlock), 0)
 	n, err := GenerateTransactionMsg(txs, []byte("tx"), topic)
 	if err != nil {
