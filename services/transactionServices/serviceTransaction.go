@@ -101,6 +101,7 @@ func SendTransactionMsg(ip [4]byte, topic [2]byte) bool {
 	}
 	if !Send(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send standard transaction")
+		time.Sleep(2000 * time.Millisecond)
 		return false
 	}
 	return true
@@ -114,6 +115,7 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 	}
 	if !Send(ip, transactionMsg.GetBytes()) {
 		logger.GetLogger().Println("could not send send transaction in GT message")
+		time.Sleep(2000 * time.Millisecond)
 	}
 }
 
