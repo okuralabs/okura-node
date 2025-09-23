@@ -179,7 +179,7 @@ func sendSyncMsgInLoop() {
 		n := generateSyncMsgHeight()
 		if !Send([4]byte{0, 0, 0, 0}, n) {
 			logger.GetLogger().Println("could not send 'hi' message")
-			time.Sleep(time.Millisecond * 2000)
+			//time.Sleep(time.Millisecond * 2000)
 		}
 		time.Sleep(time.Millisecond * 1000)
 	}

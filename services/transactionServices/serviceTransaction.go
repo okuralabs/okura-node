@@ -101,7 +101,7 @@ func SendTransactionMsg(ip [4]byte, topic [2]byte) bool {
 	}
 	if !Send(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send standard transaction")
-		time.Sleep(2000 * time.Millisecond)
+		//time.Sleep(2000 * time.Millisecond)
 		return false
 	}
 	return true
@@ -115,7 +115,7 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 	}
 	if !Send(ip, transactionMsg.GetBytes()) {
 		logger.GetLogger().Println("could not send send transaction in GT message")
-		time.Sleep(2000 * time.Millisecond)
+		//time.Sleep(2000 * time.Millisecond)
 	}
 }
 
@@ -169,7 +169,7 @@ func BroadcastTxn(ignoreAddr [4]byte, nb []byte) {
 			//logger.GetLogger().Println("send transactions to ", int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
 			if !Send(ip, nb) {
 				logger.GetLogger().Println("could not broadcast transaction")
-				time.Sleep(time.Millisecond * 2000)
+				//time.Sleep(time.Millisecond * 2000)
 			}
 		}
 	}
