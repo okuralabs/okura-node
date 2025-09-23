@@ -125,10 +125,9 @@ func Send(addr [4]byte, nb []byte) bool {
 	lockChan := make(chan struct{}, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
-
+	services.SendMutexTx.Lock()
+	defer services.SendMutexTx.Unlock()
 	go func() {
-		services.SendMutexTx.Lock()
-
 		// Check if context is still valid
 		select {
 		case <-ctx.Done():
@@ -142,8 +141,6 @@ func Send(addr [4]byte, nb []byte) bool {
 
 	select {
 	case <-lockChan:
-		defer services.SendMutexTx.Unlock()
-
 		select {
 		case services.SendChanTx <- nb:
 			return true
