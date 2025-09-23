@@ -143,15 +143,14 @@ func Send(addr [4]byte, nb []byte) bool {
 	lockChan := make(chan struct{}, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
-
+	services.SendMutexSync.Lock()
+	defer services.SendMutexSync.Unlock()
 	go func() {
-		services.SendMutexSync.Lock()
 
 		// Check if context is still valid
 		select {
 		case <-ctx.Done():
 			// Timeout occurred, we need to unlock and exit
-			services.SendMutexSync.Unlock()
 			return
 		case lockChan <- struct{}{}:
 			// Successfully notified, don't unlock here
@@ -160,7 +159,6 @@ func Send(addr [4]byte, nb []byte) bool {
 
 	select {
 	case <-lockChan:
-		defer services.SendMutexSync.Unlock()
 
 		select {
 		case services.SendChanSync <- nb:

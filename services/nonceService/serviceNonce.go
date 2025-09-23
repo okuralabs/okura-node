@@ -226,14 +226,14 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
 
+	services.SendMutexNonceSelf.Lock()
+	defer services.SendMutexNonceSelf.Unlock()
 	go func() {
-		services.SendMutexNonceSelf.Lock()
 
 		// Check if context is still valid
 		select {
 		case <-ctx.Done():
 			// Timeout occurred, we need to unlock and exit
-			services.SendMutexNonceSelf.Unlock()
 			return
 		case lockChan <- struct{}{}:
 			// Successfully notified, don't unlock here
@@ -242,8 +242,6 @@ func SendSelf(addr [4]byte, nb []byte) bool {
 
 	select {
 	case <-lockChan:
-		defer services.SendMutexNonceSelf.Unlock()
-
 		select {
 		case services.SendChanSelfNonce <- nb:
 			return true
@@ -284,15 +282,13 @@ func Send(addr [4]byte, nb []byte) bool {
 	lockChan := make(chan struct{}, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
-
+	services.SendMutexNonce.Lock()
+	defer services.SendMutexNonce.Unlock()
 	go func() {
-		services.SendMutexNonce.Lock()
-
 		// Check if context is still valid
 		select {
 		case <-ctx.Done():
 			// Timeout occurred, we need to unlock and exit
-			services.SendMutexNonce.Unlock()
 			return
 		case lockChan <- struct{}{}:
 			// Successfully notified, don't unlock here
@@ -301,8 +297,6 @@ func Send(addr [4]byte, nb []byte) bool {
 
 	select {
 	case <-lockChan:
-		defer services.SendMutexNonce.Unlock()
-
 		select {
 		case services.SendChanNonce <- nb:
 			return true
