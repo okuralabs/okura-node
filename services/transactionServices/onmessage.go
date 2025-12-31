@@ -1,6 +1,8 @@
 package transactionServices
 
 import (
+	"bytes"
+
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/message"
@@ -65,7 +67,7 @@ func OnMessage(addr [4]byte, m []byte) {
 						logger.GetLogger().Println(err)
 						continue
 					}
-					if !common.IsSyncing.Load() {
+					if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
 						//maybe we should not broadcast automatically transactions. Third party should care about it
 						BroadcastTxn(addr, m)
 					}
