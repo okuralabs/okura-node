@@ -3,8 +3,9 @@ package account
 import (
 	"bytes"
 	"fmt"
-	"github.com/okuralabs/okura-node/logger"
 	"sync"
+
+	"github.com/okuralabs/okura-node/logger"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/database"
@@ -37,7 +38,12 @@ func AddTransactionsSender(address [common.AddressLength]byte, hashTxn common.Ha
 func AddTransactionsRecipient(address [common.AddressLength]byte, hashTxn common.Hash) {
 	AccountsRWMutex.Lock()
 	defer AccountsRWMutex.Unlock()
-	acc := Accounts.AllAccounts[address]
+	var isOK bool
+	var acc Account
+	if acc, isOK = Accounts.AllAccounts[address]; !isOK {
+		SetAccountByAddressBytes(address[:])
+	}
+	// acc := Accounts.AllAccounts[address]
 	if acc.TransactionsRecipient != nil {
 		acc.TransactionsRecipient = append(acc.TransactionsRecipient, hashTxn)
 	} else {
