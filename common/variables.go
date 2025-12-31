@@ -12,6 +12,12 @@ var heightMutex sync.RWMutex
 var BlockMutex sync.Mutex
 var NonceMutex sync.Mutex
 var IsSyncing = atomic.Bool{}
+var IsMiner = atomic.Bool{}
+
+func init() {
+	IsSyncing.Store(true)
+	IsMiner.Store(false)
+}
 
 func GetHeight() int64 {
 	heightMutex.RLock()
