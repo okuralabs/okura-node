@@ -17,7 +17,12 @@ func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount in
 	fee := tx.GasPrice * tx.GasUsage
 	amount := tx.TxData.Amount
 	address := tx.GetSenderAddress()
+	addressRecipient := tx.TxData.Recipient
+
+	account.SetAccountByAddressBytes(addressRecipient.ByteValue[:])
+
 	acc, exist := account.GetAccountByAddressBytes(address.GetBytes())
+
 	if !exist || !bytes.Equal(acc.Address[:], address.GetBytes()) {
 		logger.GetLogger().Println("no account found in check staking transaction: CheckStakingTransaction")
 		return false
@@ -30,7 +35,7 @@ func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount in
 		logger.GetLogger().Println("not enough funds on account to cover sumFee: CheckStakingTransaction")
 		return false
 	}
-	addressRecipient := tx.TxData.Recipient
+
 	var err error
 	var n int
 	if tx.GetLockedAmount() > 0 {
