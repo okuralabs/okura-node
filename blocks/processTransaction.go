@@ -19,11 +19,11 @@ func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount in
 	address := tx.GetSenderAddress()
 	addressRecipient := tx.TxData.Recipient
 
-	account.SetAccountByAddressBytes(addressRecipient.ByteValue[:])
-
+	// account.SetAccountByAddressBytes(addressRecipient.ByteValue[:])
+	account.AddTransactionsRecipient(addressRecipient.ByteValue, tx.GetHash())
 	acc, exist := account.GetAccountByAddressBytes(address.GetBytes())
-
-	if !exist || !bytes.Equal(acc.Address[:], address.GetBytes()) {
+	// || !bytes.Equal(acc.Address[:], address.GetBytes())
+	if !exist {
 		logger.GetLogger().Println("no account found in check staking transaction: CheckStakingTransaction")
 		return false
 	}
