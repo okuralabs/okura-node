@@ -2,10 +2,11 @@ package transactionsPool
 
 import (
 	"container/heap"
+	"sync"
+
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
-	"sync"
 )
 
 var (
@@ -124,15 +125,15 @@ func (tp *TransactionPool) PeekTransactions(n int, heightOrHash int64) []transac
 	for i := 0; i < n; i++ {
 		if len(tp.priorityQueue) > i {
 			transaction := *tp.priorityQueue[i]
-			if tp.typePool == 0 {
+			if tp.typePool == uint8(0) {
 				copy(hash[:], transaction.GetHash().GetBytes())
 				topTransactions = append(topTransactions, tp.transactions[hash])
-			} else if tp.typePool == 1 {
+			} else if tp.typePool == uint8(1) {
 				if heightOrHash >= transaction.priority {
 					copy(hash[:], transaction.GetHash().GetBytes())
 					topTransactions = append(topTransactions, tp.transactions[hash])
 				}
-			} else if tp.typePool == 2 {
+			} else if tp.typePool == uint8(2) {
 				if heightOrHash == transaction.priority {
 					copy(hash[:], transaction.GetHash().GetBytes())
 					topTransactions = append(topTransactions, tp.transactions[hash])
