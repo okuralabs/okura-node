@@ -161,7 +161,7 @@ func BroadcastTxn(ignoreAddr [4]byte, nb []byte) {
 	num_peers := len(peers)
 	for topicip, _ := range peers {
 		// trying to send randomly to 1 other nodes
-		if rand.Intn(num_peers) >= 1 {
+		if !bytes.Equal(ignoreAddr[:], []byte{0, 0, 0, 0}) || rand.Intn(num_peers) >= 1 {
 			continue
 		}
 		copy(ip[:], topicip[2:])
