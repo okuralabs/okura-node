@@ -3,6 +3,7 @@ package blocks
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -154,6 +155,7 @@ func ProcessTransaction(tx transactionsDefinition.Transaction, height int64) err
 	account.AddTransactionsSender(address.ByteValue, tx.GetHash())
 	addressRecipient := tx.TxData.Recipient
 	account.AddTransactionsRecipient(addressRecipient.ByteValue, tx.GetHash())
+
 	var err error
 	var n int
 	if tx.GetLockedAmount() > 0 {
