@@ -222,7 +222,7 @@ func OnMessage(addr [4]byte, m []byte) {
 				}
 				hashesMissing := blocks.IsAllTransactions(newBlock)
 				if len(hashesMissing) > 0 {
-					transactionServices.SendGT(addr, hashesMissing, "st")
+					transactionServices.SendGT(addr, hashesMissing, "bt")
 					return
 				}
 
