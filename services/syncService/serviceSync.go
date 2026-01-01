@@ -2,8 +2,6 @@ package syncServices
 
 import (
 	"bytes"
-	"context"
-	"log"
 	"time"
 
 	"github.com/okuralabs/okura-node/blocks"
@@ -137,48 +135,48 @@ func SendGetHeaders(addr [4]byte, height int64) {
 	}
 }
 
-// func Send(addr [4]byte, nb []byte) bool {
-//     nb = append(addr[:], nb...)
-
-//     services.SendMutexSync.Lock()
-//     defer services.SendMutexSync.Unlock()
-
-//     select {
-//     case services.SendChanSync <- nb:
-//         return true
-//     default:
-//         return false
-//     }
-// }
-
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-
-	// Próba zdobycia locka z timeoutem
-	lockChan := make(chan struct{})
-	go func() {
-		services.SendMutexSync.Lock()
-		close(lockChan)
-	}()
+	services.SendMutexSync.Lock()
+	defer services.SendMutexSync.Unlock()
 
 	select {
-	case <-lockChan:
-		defer services.SendMutexSync.Unlock()
-
-		select {
-		case services.SendChanSync <- nb:
-			return true
-		default:
-			return false
-		}
-	case <-ctx.Done():
-		log.Println("Failed to acquire lock within timeout")
+	case services.SendChanSync <- nb:
+		return true
+	default:
 		return false
 	}
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	// Próba zdobycia locka z timeoutem
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexSync.Lock()
+// 		close(lockChan)
+// 	}()
+
+// 	select {
+// 	case <-lockChan:
+// 		defer services.SendMutexSync.Unlock()
+
+// 		select {
+// 		case services.SendChanSync <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		log.Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
 
 func sendSyncMsgInLoop() {
 	for {

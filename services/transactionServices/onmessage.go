@@ -43,7 +43,7 @@ func OnMessage(addr [4]byte, m []byte) {
 			logger.GetLogger().Println("no more transactions can be accepted to the pool")
 			return
 		}
-		if !common.IsSyncing.Load() && common.IsMiner.Load() {
+		if common.IsMiner.Load() {
 			// need to check transactions
 			for _, v := range txn {
 				for _, t := range v {
