@@ -137,39 +137,45 @@ func SendGetHeaders(addr [4]byte, height int64) {
 	}
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+//     nb = append(addr[:], nb...)
+
+//     services.SendMutexSync.Lock()
+//     defer services.SendMutexSync.Unlock()
+
+//     select {
+//     case services.SendChanSync <- nb:
+//         return true
+//     default:
+//         return false
+//     }
+// }
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	lockChan := make(chan struct{}, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
-	services.SendMutexSync.Lock()
-	defer services.SendMutexSync.Unlock()
-	go func() {
 
-		// Check if context is still valid
-		select {
-		case <-ctx.Done():
-			// Timeout occurred, we need to unlock and exit
-			return
-		case lockChan <- struct{}{}:
-			// Successfully notified, don't unlock here
-		}
+	// Próba zdobycia locka z timeoutem
+	lockChan := make(chan struct{})
+	go func() {
+		services.SendMutexSync.Lock()
+		close(lockChan)
 	}()
 
 	select {
 	case <-lockChan:
+		defer services.SendMutexSync.Unlock()
 
 		select {
 		case services.SendChanSync <- nb:
 			return true
 		default:
-			//services.PurgeChannel(services.SendChanSync, 3)
 			return false
 		}
 	case <-ctx.Done():
 		log.Println("Failed to acquire lock within timeout")
-		// The goroutine will handle unlocking if it got the lock
 		return false
 	}
 }
