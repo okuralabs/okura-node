@@ -2,8 +2,6 @@ package transactionServices
 
 import (
 	"bytes"
-	"context"
-	"log"
 	"math/rand"
 	"time"
 
@@ -122,38 +120,52 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	lockChan := make(chan struct{}, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
 	services.SendMutexTx.Lock()
 	defer services.SendMutexTx.Unlock()
-	go func() {
-		// Check if context is still valid
-		select {
-		case <-ctx.Done():
-			// Timeout occurred, we need to unlock and exit
-			services.SendMutexTx.Unlock()
-			return
-		case lockChan <- struct{}{}:
-			// Successfully notified, don't unlock here
-		}
-	}()
 
 	select {
-	case <-lockChan:
-		select {
-		case services.SendChanTx <- nb:
-			return true
-		default:
-			//services.PurgeChannel(services.SendChanTx, 3)
-			return false
-		}
-	case <-ctx.Done():
-		log.Println("Failed to acquire lock within timeout")
-		// The goroutine will handle unlocking if it got the lock
+	case services.SendChanTx <- nb:
+		return true
+	default:
 		return false
 	}
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	lockChan := make(chan struct{}, 1)
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+// 	services.SendMutexTx.Lock()
+// 	defer services.SendMutexTx.Unlock()
+// 	go func() {
+// 		// Check if context is still valid
+// 		select {
+// 		case <-ctx.Done():
+// 			// Timeout occurred, we need to unlock and exit
+// 			services.SendMutexTx.Unlock()
+// 			return
+// 		case lockChan <- struct{}{}:
+// 			// Successfully notified, don't unlock here
+// 		}
+// 	}()
+
+// 	select {
+// 	case <-lockChan:
+// 		select {
+// 		case services.SendChanTx <- nb:
+// 			return true
+// 		default:
+// 			//services.PurgeChannel(services.SendChanTx, 3)
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		log.Println("Failed to acquire lock within timeout")
+// 		// The goroutine will handle unlocking if it got the lock
+// 		return false
+// 	}
+// }
 
 func BroadcastTxn(ignoreAddr [4]byte, nb []byte) {
 	var ip [4]byte
