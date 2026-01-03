@@ -216,8 +216,6 @@ func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
 	if !SendSelf(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send nonce message")
 		//time.Sleep(time.Millisecond * 2000)
-	} else {
-		common.IsMiner.Store(true)
 	}
 }
 

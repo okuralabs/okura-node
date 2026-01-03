@@ -162,6 +162,11 @@ func OnMessage(addr [4]byte, m []byte) {
 
 		}
 
+		if n2, err := account.IntDelegatedAccountFromAddress(common.GetDelegatedAccount()); err == nil && n2 == n {
+			common.IsMiner.Store(true)
+			logger.GetLogger().Println("I am the miner")
+		}
+
 		if newBlock.CheckProofOfSynergy() {
 			_, _, err := blocks.CheckBlockTransfers(newBlock, lastBlock, merkleTrie, false)
 			if err == nil {
