@@ -166,8 +166,9 @@ func OnMessage(addr [4]byte, m []byte) {
 					logger.GetLogger().Printf("ERROR: Failed to load block hash for index %d: %v", index, err)
 					defer services.AdjustShiftInPastInReset(hmax)
 					common.ShiftToPastMutex.RLock()
-					defer common.ShiftToPastMutex.RUnlock()
+
 					services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+					common.ShiftToPastMutex.RUnlock()
 					panic("cannot load block hash")
 				}
 				if bytes.Equal(block.BlockHash.GetBytes(), hashOfMyBlockBytes) {
@@ -178,8 +179,8 @@ func OnMessage(addr [4]byte, m []byte) {
 				logger.GetLogger().Printf("Block hash mismatch at index %d - potential fork detected", index)
 				defer services.AdjustShiftInPastInReset(hmax)
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
 				panic("potential fork detected")
 			}
 			if was {
@@ -242,8 +243,8 @@ func OnMessage(addr [4]byte, m []byte) {
 				logger.GetLogger().Printf("ERROR: Height mismatch - Block header height: %d, Expected index: %d", header.Height, index)
 				defer services.AdjustShiftInPastInReset(hmax)
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
 				panic("not relevant height vs index")
 			}
 
@@ -255,8 +256,8 @@ func OnMessage(addr [4]byte, m []byte) {
 				tcpip.ReduceAndCheckIfBanIP(addr)
 				services.AdjustShiftInPastInReset(hmax)
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
 				panic(err)
 
 			}
