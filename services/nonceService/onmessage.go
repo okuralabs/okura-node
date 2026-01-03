@@ -182,8 +182,8 @@ func OnMessage(addr [4]byte, m []byte) {
 
 	case "bl": //block
 
-		// common.BlockMutex.Lock()
-		// defer common.BlockMutex.Unlock()
+		common.BlockMutex.Lock()
+		defer common.BlockMutex.Unlock()
 
 		lastBlock, err := blocks.LoadBlock(h)
 		if err != nil {

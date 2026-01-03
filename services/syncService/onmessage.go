@@ -286,8 +286,8 @@ func OnMessage(addr [4]byte, m []byte) {
 				common.IsSyncing.Store(false)
 			}
 		}()
-		// common.BlockMutex.Lock()
-		// defer common.BlockMutex.Unlock()
+		common.BlockMutex.Lock()
+		defer common.BlockMutex.Unlock()
 		was = false
 		for i := 0; i < len(blcks); i++ {
 			block := blcks[i]
