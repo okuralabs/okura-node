@@ -3,6 +3,9 @@ package qtwidgets
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
+	"strconv"
+
 	"github.com/okuralabs/okura-node/common"
 	clientrpc "github.com/okuralabs/okura-node/rpc/client"
 	"github.com/okuralabs/okura-node/services/transactionServices"
@@ -10,8 +13,6 @@ import (
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/therecipe/qt/widgets"
 	"golang.org/x/exp/rand"
-	"math"
-	"strconv"
 )
 
 var ChainID = int16(23)

@@ -2,6 +2,7 @@ package syncServices
 
 import (
 	"bytes"
+	"context"
 	"time"
 
 	"github.com/okuralabs/okura-node/blocks"
@@ -135,19 +136,72 @@ func SendGetHeaders(addr [4]byte, height int64) {
 	}
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	services.SendMutexSync.Lock()
+// 	defer services.SendMutexSync.Unlock()
+
+// 	select {
+// 	case services.SendChanSync <- nb:
+// 		return true
+// 	default:
+// 		return false
+// 	}
+// }
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
 	services.SendMutexSync.Lock()
 	defer services.SendMutexSync.Unlock()
-
+	defer cancel()
 	select {
 	case services.SendChanSync <- nb:
 		return true
-	default:
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 10000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexSync.Lock()
+// 		defer services.SendMutexSync.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanSync <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
 
 // func Send(addr [4]byte, nb []byte) bool {
 // 	nb = append(addr[:], nb...)
@@ -173,7 +227,7 @@ func Send(addr [4]byte, nb []byte) bool {
 // 			return false
 // 		}
 // 	case <-ctx.Done():
-// 		log.Println("Failed to acquire lock within timeout")
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
 // 		return false
 // 	}
 // }
@@ -215,9 +269,9 @@ func StartSubscribingSyncMsg(ip [4]byte) {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (sync msg)", ip)

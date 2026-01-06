@@ -48,21 +48,18 @@ func ListenRPC() {
 
 func (l *Listener) Send(lineBeg []byte, reply *[]byte) error {
 	listenerMutex.Lock()
-
+	defer listenerMutex.Unlock()
 	if len(lineBeg) < 4 {
 		*reply = []byte("Error with message. Too small length calling server")
-		listenerMutex.Unlock()
 		return nil
 	}
 	line, left, err := common.BytesWithLenToBytes(lineBeg)
 	if err != nil {
 		*reply = []byte("wrong query")
-		listenerMutex.Unlock()
 		return nil
 	}
 	if len(line) < 4 {
 		*reply = []byte("wrong query length")
-		listenerMutex.Unlock()
 		return nil
 	}
 	operation := string(line[0:4])
@@ -83,7 +80,6 @@ func (l *Listener) Send(lineBeg []byte, reply *[]byte) error {
 	if verificationNeeded {
 		if len(signatureBytes) == 0 {
 			*reply = []byte("Invalid signature with length 0")
-			listenerMutex.Unlock()
 			return nil
 		}
 		activeWallet = wallet.GetActiveWallet()
@@ -95,11 +91,10 @@ func (l *Listener) Send(lineBeg []byte, reply *[]byte) error {
 
 		if !wallet.Verify(common.BytesToLenAndBytes(line), signatureBytes, pubKey.GetBytes(), common.SigName(), common.SigName2(), common.IsPaused(), common.IsPaused2()) {
 			*reply = []byte("Invalid signature")
-			listenerMutex.Unlock()
 			return nil
 		}
 	}
-	listenerMutex.Unlock()
+
 	switch operation {
 	case "STAT":
 		handleSTAT(byt, reply)

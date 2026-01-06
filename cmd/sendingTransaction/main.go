@@ -9,7 +9,6 @@ import (
 	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
 	"github.com/therecipe/qt/widgets"
 
-	"os"
 	"time"
 
 	"github.com/okuralabs/okura-node/common"
@@ -25,13 +24,13 @@ var mutex sync.Mutex
 var MainWallet *wallet.Wallet
 
 func main() {
-	var ip string
-	if len(os.Args) > 1 {
-		ip = os.Args[1]
-	} else {
-		ip = "127.0.0.1"
-	}
-	go clientrpc.ConnectRPC(ip)
+	// var ip string
+	// if len(os.Args) > 1 {
+	// 	ip = os.Args[1]
+	// } else {
+	// 	ip = "127.0.0.1"
+	// }
+	// go clientrpc.ConnectRPC(ip)
 	//fmt.Print("Enter password: ")
 	//password, err := terminal.ReadPassword(0)
 	//if err != nil {
