@@ -9,6 +9,7 @@ import (
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/transactionsPool"
+	"github.com/okuralabs/okura-node/wallet"
 )
 
 var ZerosHash = make([]byte, common.HashLength)
@@ -345,6 +346,7 @@ func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height 
 	amount := mainTx.TxData.Amount
 	address := mainTx.GetSenderAddress()
 	addressRecipient := mainTx.TxData.Recipient
+	ban := bytes.Equal(address.GetBytes(), wallet.GetActiveWallet().MainAddress.GetBytes())
 	var err error
 	var n int
 	if mainTx.GetLockedAmount() > 0 {
@@ -366,7 +368,7 @@ func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height 
 			err = AddBalance(address.ByteValue, -amount)
 			if err != nil {
 				// this can happen very rare. Only when escrow is multisign account
-				transactionsPool.RemoveBadTransactionByHash(mainTx.Hash.GetBytes(), height, tree)
+				transactionsPool.RemoveBadTransactionByHash(mainTx.Hash.GetBytes(), height, tree, ban)
 				return err
 			}
 
@@ -389,6 +391,7 @@ func ProcessTransactionsEscrow(height int64, tree *transactionsPool.MerkleTree) 
 		amount := tx.TxData.Amount
 		address := tx.GetSenderAddress()
 		addressRecipient := tx.TxData.Recipient
+		ban := bytes.Equal(address.GetBytes(), wallet.GetActiveWallet().MainAddress.GetBytes())
 		var err error
 		var n int
 		if tx.GetLockedAmount() > 0 {
@@ -420,7 +423,7 @@ func ProcessTransactionsEscrow(height int64, tree *transactionsPool.MerkleTree) 
 				err = AddBalance(address.ByteValue, -amount)
 				if err != nil {
 					// this can happen very rare. Only when escrow is multisign account
-					transactionsPool.RemoveBadTransactionByHash(tx.Hash.GetBytes(), height, tree)
+					transactionsPool.RemoveBadTransactionByHash(tx.Hash.GetBytes(), height, tree, ban)
 					return err
 				}
 
