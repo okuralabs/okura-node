@@ -1,8 +1,6 @@
 package transactionServices
 
 import (
-	"bytes"
-
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/message"
@@ -38,11 +36,14 @@ func OnMessage(addr [4]byte, m []byte) {
 		if err != nil {
 			return
 		}
+
 		//logger.GetLogger().Println("get tx from ", addr[:])
 		if transactionsPool.PoolsTx.NumberOfTransactions() > common.MaxTransactionInPool {
 			logger.GetLogger().Println("no more transactions can be accepted to the pool")
 			return
 		}
+		BroadcastTxn(addr, m)
+		logger.GetLogger().Print("Broadcasting txn Only")
 		// if common.IsMiner.Load() {
 		// need to check transactions
 		for _, v := range txn {
@@ -70,16 +71,15 @@ func OnMessage(addr [4]byte, m []byte) {
 					}
 
 				}
-				if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
-					//maybe we should not broadcast automatically transactions. Third party should care about it
-					BroadcastTxn(addr, m)
-					logger.GetLogger().Print("Broadcasting txn")
-				}
+				// if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
+				// 	//maybe we should not broadcast automatically transactions. Third party should care about it
+				// 	BroadcastTxn(addr, m)
+				// 	logger.GetLogger().Print("Broadcasting txn")
+				// }
 			}
 		}
 		// } else {
-		// 	BroadcastTxn(addr, m)
-		// 	logger.GetLogger().Print("Broadcasting txn Only")
+
 		// }
 	case "bx":
 		// transaction in sync
