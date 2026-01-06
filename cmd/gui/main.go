@@ -9,7 +9,6 @@ import (
 
 	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
 	"github.com/okuralabs/okura-node/common"
-	clientrpc "github.com/okuralabs/okura-node/rpc/client"
 	"github.com/okuralabs/okura-node/statistics"
 	"github.com/okuralabs/okura-node/tcpip"
 	"github.com/okuralabs/okura-node/wallet"
@@ -18,14 +17,14 @@ import (
 
 func main() {
 
-	var ip string
-	if len(os.Args) > 1 {
-		ip = os.Args[1]
-	} else {
-		ip = "127.0.0.1"
-	}
+	// var ip string
+	// if len(os.Args) > 1 {
+	// 	ip = os.Args[1]
+	// } else {
+	// 	ip = "127.0.0.1"
+	// }
 	statistics.InitStatsManager()
-	go clientrpc.ConnectRPC(ip)
+	// go clientrpc.ConnectRPC(ip)
 	time.Sleep(time.Second)
 	fmt.Println(os.Args)
 

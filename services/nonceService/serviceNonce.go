@@ -3,7 +3,6 @@ package nonceServices
 import (
 	"bytes"
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -222,39 +221,55 @@ func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
 func SendSelf(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
-	lockChan := make(chan struct{}, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
 
 	services.SendMutexNonceSelf.Lock()
 	defer services.SendMutexNonceSelf.Unlock()
-	go func() {
-
-		// Check if context is still valid
-		select {
-		case <-ctx.Done():
-			// Timeout occurred, we need to unlock and exit
-			return
-		case lockChan <- struct{}{}:
-			// Successfully notified, don't unlock here
-		}
-	}()
-
+	defer cancel()
 	select {
-	case <-lockChan:
-		select {
-		case services.SendChanSelfNonce <- nb:
-			return true
-		default:
-			//services.PurgeChannel(services.SendChanSelfNonce, 3)
-			return false
-		}
+	case services.SendChanSelfNonce <- nb:
+		return true
 	case <-ctx.Done():
-		log.Println("Failed to acquire lock within timeout")
-		// The goroutine will handle unlocking if it got the lock
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
+
+// func SendSelf(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexNonceSelf.Lock()
+// 		defer services.SendMutexNonceSelf.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanSelfNonce <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
 
 func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	h := common.GetHeight()
@@ -276,16 +291,33 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	}
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	services.SendMutexNonce.Lock()
+// 	defer services.SendMutexNonce.Unlock()
+
+// 	select {
+// 	case services.SendChanNonce <- nb:
+// 		return true
+// 	default:
+// 		return false
+// 	}
+// }
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
 	services.SendMutexNonce.Lock()
 	defer services.SendMutexNonce.Unlock()
-
+	defer cancel()
 	select {
 	case services.SendChanNonce <- nb:
 		return true
-	default:
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
@@ -367,9 +399,9 @@ func StartSubscribingNonceMsg(ip [4]byte) {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (nonce msg)", ip)
@@ -410,10 +442,10 @@ func StartSubscribingNonceMsgSelf() {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (nonce msg self)")

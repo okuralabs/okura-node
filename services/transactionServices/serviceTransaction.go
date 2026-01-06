@@ -2,6 +2,7 @@ package transactionServices
 
 import (
 	"bytes"
+	"context"
 	"math/rand"
 	"time"
 
@@ -120,16 +121,55 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
 	services.SendMutexTx.Lock()
 	defer services.SendMutexTx.Unlock()
-
+	defer cancel()
 	select {
 	case services.SendChanTx <- nb:
 		return true
-	default:
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
 		return false
 	}
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexTx.Lock()
+// 		defer services.SendMutexTx.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanTx <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
 
 // func Send(addr [4]byte, nb []byte) bool {
 // 	nb = append(addr[:], nb...)
@@ -161,7 +201,7 @@ func Send(addr [4]byte, nb []byte) bool {
 // 			return false
 // 		}
 // 	case <-ctx.Done():
-// 		log.Println("Failed to acquire lock within timeout")
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
 // 		// The goroutine will handle unlocking if it got the lock
 // 		return false
 // 	}
@@ -216,8 +256,8 @@ func StartSubscribingTransactionMsg(ip [4]byte) {
 		case <-tcpip.Quit:
 			logger.GetLogger().Printf("Received quit signal for peer %v", ip)
 			services.QUIT.Store(true)
-		default:
-			time.Sleep(time.Millisecond * 100) // Reduced sleep time
+			// default:
+			// time.Sleep(time.Millisecond * 100) // Reduced sleep time
 		}
 	}
 	logger.GetLogger().Println("Exiting transaction message receiving loop for peer:", ip)

@@ -3,6 +3,7 @@ package tcpip
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -187,7 +188,7 @@ func Send(conn *net.TCPConn, message []byte) error {
 	message = append(message, []byte("<-END->")...)
 
 	// Set write deadline to 2 seconds
-	conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
+	conn.SetWriteDeadline(time.Now().Add(time.Second))
 
 	_, err := conn.Write(message)
 	if err != nil {
@@ -209,11 +210,10 @@ func Receive(topic [2]byte, conn *net.TCPConn) []byte {
 	n, err := conn.Read(buf)
 
 	if err != nil {
-		//if err == io.EOF {
-		//	return []byte("<-CLS->")
-		//}
-		//logger.GetLogger().Println("n=", n, "err", err.Error())
-		//handleConnectionError(err, topic, conn)
+		if err == io.EOF {
+			return []byte("<-CLS->")
+		}
+		logger.GetLogger().Println("n=", n, "err", err.Error())
 		return []byte("<-ERR->")
 	}
 
