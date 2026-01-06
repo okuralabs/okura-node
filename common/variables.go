@@ -18,7 +18,7 @@ var IsMiner = atomic.Bool{}
 
 func init() {
 	IsSyncing.Store(false)
-	IsMiner.Store(true)
+	IsMiner.Store(false)
 }
 
 func GetHeight() int64 {
