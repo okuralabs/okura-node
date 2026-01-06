@@ -70,14 +70,14 @@ func OnMessage(addr [4]byte, m []byte) {
 						}
 						if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
 							//maybe we should not broadcast automatically transactions. Third party should care about it
-							// BroadcastTxn(addr, m)
+							BroadcastTxn(addr, m)
 							logger.GetLogger().Print("Broadcasting txn")
 						}
 					}
 				}
 			}
 		} else {
-			// BroadcastTxn(addr, m)
+			BroadcastTxn(addr, m)
 			logger.GetLogger().Print("Broadcasting txn Only")
 		}
 	case "bx":
