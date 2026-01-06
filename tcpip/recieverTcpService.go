@@ -26,7 +26,7 @@ var (
 	PeersCount          = 0
 	waitChan            = make(chan []byte)
 	tcpConnections      = make(map[[2]byte]map[[4]byte]*net.TCPConn)
-	PeersMutex          = &sync.RWMutex{}
+	PeersMutex          = sync.RWMutex{}
 	Quit                chan os.Signal
 	TransactionTopic    = [2]byte{'T', 'T'}
 	NonceTopic          = [2]byte{'N', 'N'}
@@ -341,30 +341,30 @@ func GetPeersConnected(topic [2]byte) map[[6]byte][2]byte {
 }
 
 func GetIPsConnected() [][]byte {
-	if PeersMutex.TryLock() {
-		defer PeersMutex.Unlock()
-		uniqueIPs := make(map[[4]byte]struct{})
-		for key, value := range nodePeersConnected {
-			if value > 1 {
-				if bytes.Equal(key[:], MyIP[:]) {
-					continue
-				}
-				uniqueIPs[key] = struct{}{}
+	PeersMutex.RLock()
+	defer PeersMutex.RUnlock()
+	uniqueIPs := make(map[[4]byte]struct{})
+	for key, value := range nodePeersConnected {
+		if value > 1 {
+			if bytes.Equal(key[:], MyIP[:]) {
+				continue
 			}
-		}
-		var ips [][]byte
-		for ip := range uniqueIPs {
-			ips = append(ips, ip[:])
-		}
-		PeersCount = len(ips)
-		// return one random peer only
-		if PeersCount > 0 {
-			rn := rand.Intn(PeersCount)
-			return [][]byte{ips[rn]}
-		} else {
-			return [][]byte{}
+			uniqueIPs[key] = struct{}{}
 		}
 	}
+	var ips [][]byte
+	for ip := range uniqueIPs {
+		ips = append(ips, ip[:])
+	}
+	PeersCount = len(ips)
+	// return one random peer only
+	if PeersCount > 0 {
+		rn := rand.Intn(PeersCount)
+		return [][]byte{ips[rn]}
+	} else {
+		return [][]byte{}
+	}
+
 	return [][]byte{}
 }
 
