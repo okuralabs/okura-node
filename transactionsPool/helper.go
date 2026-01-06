@@ -2,12 +2,13 @@ package transactionsPool
 
 import (
 	"fmt"
+
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 )
 
-func RemoveBadTransactionByHash(hash []byte, height int64, tree *MerkleTree) error {
+func RemoveBadTransactionByHash(hash []byte, height int64, tree *MerkleTree, ban bool) error {
 	PoolsTx.RemoveTransactionByHash(hash)
 	PoolTxEscrow.RemoveTransactionByHash(hash)
 	PoolTxMultiSign.RemoveTransactionByHash(hash)
@@ -28,9 +29,11 @@ func RemoveBadTransactionByHash(hash []byte, height int64, tree *MerkleTree) err
 	if err != nil {
 		logger.GetLogger().Println(err)
 	}
-	PoolsTx.BanTransactionByHash(hash)
-	PoolTxEscrow.BanTransactionByHash(hash)
-	PoolTxMultiSign.BanTransactionByHash(hash)
+	if ban {
+		PoolsTx.BanTransactionByHash(hash)
+		PoolTxEscrow.BanTransactionByHash(hash)
+		PoolTxMultiSign.BanTransactionByHash(hash)
+	}
 	return nil
 }
 

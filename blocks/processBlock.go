@@ -13,6 +13,7 @@ import (
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/transactionsPool"
 	"github.com/okuralabs/okura-node/voting"
+	"github.com/okuralabs/okura-node/wallet"
 )
 
 func CheckBaseBlock(newBlock Block, lastBlock Block, forceShouldCheck bool) (*transactionsPool.MerkleTree, error) {
@@ -193,6 +194,7 @@ func CheckBlockTransfers(block Block, lastBlock Block, tree *transactionsPool.Me
 		total_amount := fee + amount
 		address := poolTx.TxParam.Sender
 		recipientAddress := poolTx.TxData.Recipient
+		ban := bytes.Equal(address.GetBytes(), wallet.GetActiveWallet().MainAddress.GetBytes())
 		var n int
 		if poolTx.GetLockedAmount() > 0 {
 			n, err = account.IntDelegatedAccountFromAddress(poolTx.TxData.DelegatedAccountForLocking)
@@ -220,18 +222,18 @@ func CheckBlockTransfers(block Block, lastBlock Block, tree *transactionsPool.Me
 			ret := CheckStakingTransaction(poolTx, stakingAccounts[stakingAcc.Address].StakedBalance, stakingAccounts[stakingAcc.Address].StakingRewards)
 			if ret == false {
 				// remove bad transaction from pool
-				transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+				transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, ban)
 				return 0, 0, fmt.Errorf("staking transactions checking fails: CheckBlockTransfers")
 			}
 		}
 		acc, exist := account.GetAccountByAddressBytes(address.GetBytes())
 		if !exist || !bytes.Equal(acc.Address[:], address.GetBytes()) {
 			// remove bad transaction from pool
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, ban)
 			return 0, 0, fmt.Errorf("no account found in check block transafer: CheckBlockTransfers")
 		}
 		if bytes.Equal(poolTx.TxParam.MultiSignTx.GetBytes(), ZerosHash) == false && (poolTx.TxData.Amount > 0 || len(poolTx.TxData.OptData) > 0 || poolTx.TxData.LockedAmount > 0 || poolTx.TxData.MultiSignNumber > 0) {
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, ban)
 			return 0, 0, fmt.Errorf("transaction which confirms in multi signature account should have amount == 0, OptData = nil, LockedAmount = 0, MultiSignNumber = 0")
 		}
 
@@ -245,7 +247,7 @@ func CheckBlockTransfers(block Block, lastBlock Block, tree *transactionsPool.Me
 		}
 		if acc.Balance < 0 {
 			// remove bad transaction from pool
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, ban)
 			return 0, 0, fmt.Errorf("not enough funds on account: CheckBlockTransfers")
 		}
 
@@ -279,20 +281,20 @@ func ProcessBlockTransfers(block Block, reward int64, tree *transactionsPool.Mer
 		}
 
 		if poolTx.Height > block.GetHeader().Height {
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, true)
 			return fmt.Errorf("transaction height is wrong: ProcessBlockTransfers")
 		}
 
 		err = ProcessTransaction(poolTx, block.GetHeader().Height)
 		if err != nil {
 			// remove bad transaction from pool
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, true)
 			return err
 		}
 		err = ProcessTransactionsMultiSign(poolTx, block.GetHeader().Height, tree)
 		if err != nil {
 			// remove bad transaction from pool
-			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree)
+			transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, true)
 			return err
 		}
 	}
