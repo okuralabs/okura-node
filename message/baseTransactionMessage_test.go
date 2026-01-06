@@ -3,6 +3,8 @@ package message
 import (
 	"bytes"
 	"testing"
+
+	"github.com/okuralabs/okura-node/common"
 )
 
 func TestAnyNonceMessage_GetTransactions(t *testing.T) {
@@ -19,7 +21,7 @@ func TestAnyNonceMessage_GetTransactions(t *testing.T) {
 		TransactionsBytes: nonceBytes,
 	}
 	// Call GetTransactionsBytes method
-	transactions, err := anyNonceMessage.GetTransactionsFromBytes()
+	transactions, err := anyNonceMessage.GetTransactionsFromBytes(common.SigName(), common.SigName2(), common.IsPaused(), common.IsPaused2())
 	if err != nil {
 		return
 	}

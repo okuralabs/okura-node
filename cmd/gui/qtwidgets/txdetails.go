@@ -3,6 +3,9 @@ package qtwidgets
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
@@ -10,8 +13,6 @@ import (
 	clientrpc "github.com/okuralabs/okura-node/rpc/client"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/therecipe/qt/widgets"
-	"strconv"
-	"strings"
 )
 
 var codeData *widgets.QTextEdit
@@ -98,20 +99,23 @@ func GetDetails(h string) string {
 
 	var b []byte
 	var err error
-	if len(h) < 16 {
+	if h == "POOL" || h == "pool" || h == "" {
+		clientrpc.InRPC <- SignMessage(append([]byte("POOL"), b...))
+	} else if len(h) < 16 {
 		height, err := strconv.Atoi(h)
 		if err != nil {
 			return "Cannot decode string. Is it really integer?"
 		}
 		b = common.GetByteInt64(int64(height))
+		clientrpc.InRPC <- SignMessage(append([]byte("DETS"), b...))
 	} else {
 		b, err = hex.DecodeString(h)
 		if err != nil {
 			return "Cannot decode string. Is it in hexadecimal format?"
 		}
+		clientrpc.InRPC <- SignMessage(append([]byte("DETS"), b...))
 	}
 
-	clientrpc.InRPC <- SignMessage(append([]byte("DETS"), b...))
 	var reply []byte
 	reply = <-clientrpc.OutRPC
 	if len(reply) <= 2 {
@@ -150,8 +154,6 @@ func GetDetails(h string) string {
 			return ""
 		}
 		return bb.GetString()
-	default:
-
 	}
 	logger.GetLogger().Println("Can not unmarshal transaction")
 	return string(reply)

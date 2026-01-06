@@ -3,10 +3,11 @@ package tcpip
 import (
 	"bytes"
 	"context"
-	"github.com/okuralabs/okura-node/common"
-	"github.com/okuralabs/okura-node/logger"
 	"sync"
 	"time"
+
+	"github.com/okuralabs/okura-node/common"
+	"github.com/okuralabs/okura-node/logger"
 )
 
 var bannedIP map[[4]byte]int64
@@ -82,19 +83,22 @@ func ReduceAndCheckIfBanIP(ip [4]byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	PeersMutex.Lock()
-	defer PeersMutex.Unlock()
+
 	select {
 	case <-ctx.Done():
 		// Handle timeout
 		logger.GetLogger().Println("ReduceAndCheckIfBanIP: timeout in sending")
-
+		PeersMutex.Unlock()
 	default:
 		if _, ok := validPeersConnected[ip]; ok {
 			ReduceTrustRegisterPeer(ip)
 		}
 		if _, ok := validPeersConnected[ip]; !ok {
 			logger.GetLogger().Println("not trusted ip", ip)
+			PeersMutex.Unlock()
 			BanIP(ip)
+		} else {
+			PeersMutex.Unlock()
 		}
 	}
 }

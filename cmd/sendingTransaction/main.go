@@ -90,6 +90,8 @@ func SignMessage(line []byte) []byte {
 	} else {
 		line = common.BytesToLenAndBytes(line)
 	}
+	// ip := net.IP(tcpip.MyIP[:]).String()
+	go clientrpc.ConnectRPC("127.0.0.1")
 	return line
 }
 
@@ -98,8 +100,8 @@ func SampleTransaction(w *wallet.Wallet) transactionsDefinition.Transaction {
 	defer mutex.Unlock()
 	sender := w.MainAddress
 	recv := common.Address{}
-	br := common.Hex2Bytes("5b21c69aaea1ddd18bd17ad6f23f109479cca304")
-	//br := rand.RandomBytes(20)
+	br := common.Hex2Bytes("5b21c69aaea1ddd18bd17ad6f23f109479cca302")
+	// br := rand.RandomBytes(20)
 	err := recv.Init(append([]byte{0}, br...))
 	if err != nil {
 		return transactionsDefinition.Transaction{}
@@ -180,6 +182,6 @@ func sendTransactions(w *wallet.Wallet) {
 		clientrpc.InRPC <- SignMessage(append([]byte("TRAN"), tmm...))
 		//logger.GetLogger().Printf("send batch %d transactions", batchSize)
 		<-clientrpc.OutRPC
-		//logger.GetLogger().Println("transactions sent")
+		logger.GetLogger().Println("transactions sent")
 	}
 }

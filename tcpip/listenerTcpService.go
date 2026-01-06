@@ -105,11 +105,12 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 						if err != nil {
 							logger.GetLogger().Println("error in sending to ", ipr, err)
 							deletedIP := CloseAndRemoveConnection(tcpConn)
-							PeersMutex.Unlock()
-							cancel()
+
 							for _, dc := range deletedIP {
 								ChanPeer <- dc
 							}
+							PeersMutex.Unlock()
+							cancel()
 							continue
 						}
 					} else {
@@ -127,7 +128,6 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 		//	}
 		case <-Quit:
 			logger.GetLogger().Println("Should exit LoopSend")
-		default:
 		}
 	}
 }
@@ -186,10 +186,11 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 			receiveChan <- []byte("EXIT")
 			PeersMutex.Lock()
 			deletedIP := CloseAndRemoveConnection(tcpConn)
-			PeersMutex.Unlock()
+
 			for _, dc := range deletedIP {
 				ChanPeer <- dc
 			}
+			PeersMutex.Unlock()
 		}
 	}()
 
@@ -208,10 +209,11 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 			logger.GetLogger().Printf("Received quit signal for connection to %v", ip)
 			PeersMutex.Lock()
 			deletedIP := CloseAndRemoveConnection(tcpConn)
-			PeersMutex.Unlock()
+
 			for _, dc := range deletedIP {
 				ChanPeer <- dc
 			}
+			PeersMutex.Unlock()
 			return
 		default:
 			r := Receive(topic, tcpConn)
@@ -225,11 +227,12 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 					PeersMutex.Lock()
 					receiveChan <- []byte("EXIT")
 					deletedIP := CloseAndRemoveConnection(tcpConn)
-					PeersMutex.Unlock()
+
 					for _, dc := range deletedIP {
 						ChanPeer <- dc
 					}
 					reconnectionTries = 0
+					PeersMutex.Unlock()
 					return
 				}
 				if reconnectionTries%10 == 9 {
@@ -250,10 +253,10 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 				PeersMutex.Lock()
 				receiveChan <- []byte("EXIT")
 				deletedIP := CloseAndRemoveConnection(tcpConn)
-				PeersMutex.Unlock()
 				for _, dc := range deletedIP {
 					ChanPeer <- dc
 				}
+				PeersMutex.Unlock()
 				return
 
 			}
@@ -276,13 +279,15 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 				logger.GetLogger().Println("error: too long message received: ", len(r))
 				PeersMutex.Lock()
 				ReduceTrustRegisterPeer(ip)
-				PeersMutex.Unlock()
+
 				rTopic[topic] = []byte{}
 				if trust, ok := validPeersConnected[ip]; ok && trust <= 0 {
+					PeersMutex.Unlock()
 					BanIP(ip)
 					receiveChan <- []byte("EXIT")
 					return
 				}
+				PeersMutex.Unlock()
 				continue
 			}
 			if bytes.Equal(r[len(r)-7:], []byte("<-END->")) {
@@ -293,12 +298,14 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 						logger.GetLogger().Println("wrong MessageInitialization", r[:4], "should be", common.MessageInitialization[:])
 						PeersMutex.Lock()
 						ReduceTrustRegisterPeer(ip)
-						PeersMutex.Unlock()
+
 						if trust, ok := validPeersConnected[ip]; ok && trust <= 0 {
+							PeersMutex.Unlock()
 							BanIP(ip)
 							receiveChan <- []byte("EXIT")
 							return
 						}
+						PeersMutex.Unlock()
 					}
 				}
 			}

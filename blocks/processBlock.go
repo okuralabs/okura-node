@@ -191,7 +191,7 @@ func CheckBlockTransfers(block Block, lastBlock Block, tree *transactionsPool.Me
 		totalFee += fee
 		amount := poolTx.TxData.Amount
 		total_amount := fee + amount
-		address := poolTx.GetSenderAddress()
+		address := poolTx.TxParam.Sender
 		recipientAddress := poolTx.TxData.Recipient
 		var n int
 		if poolTx.GetLockedAmount() > 0 {

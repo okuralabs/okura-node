@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
@@ -14,8 +17,6 @@ import (
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/transactionsPool"
 	"github.com/okuralabs/okura-node/wallet"
-	"os"
-	"strings"
 )
 
 type GenesisStaking struct {
@@ -240,7 +241,6 @@ func CreateBlockFromGenesis(genesis Genesis) blocks.Block {
 		logger.GetLogger().Fatal(err)
 	}
 	bh.Signature = signature
-
 	bhHash, err := bh.CalcHash()
 	if err != nil {
 		logger.GetLogger().Fatalf("cannot calculate hash of genesis block header %v", err)

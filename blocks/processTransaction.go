@@ -16,7 +16,7 @@ var ZerosHash = make([]byte, common.HashLength)
 func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount int64, sumFee int64) bool {
 	fee := tx.GasPrice * tx.GasUsage
 	amount := tx.TxData.Amount
-	address := tx.GetSenderAddress()
+	address := tx.TxParam.Sender
 	addressRecipient := tx.TxData.Recipient
 
 	// account.SetAccountByAddressBytes(addressRecipient.ByteValue[:])

@@ -21,11 +21,12 @@ var AccountsRWMutex sync.RWMutex
 
 func AddTransactionsSender(address [common.AddressLength]byte, hashTxn common.Hash) {
 	AccountsRWMutex.Lock()
-	defer AccountsRWMutex.Unlock()
 	var acc Account
 	var isOK bool
 	if acc, isOK = Accounts.AllAccounts[address]; !isOK {
+		AccountsRWMutex.Unlock()
 		SetAccountByAddressBytes(address[:])
+		AccountsRWMutex.Lock()
 	}
 	if acc.TransactionsSender != nil {
 		acc.TransactionsSender = append(acc.TransactionsSender, hashTxn)
@@ -33,15 +34,18 @@ func AddTransactionsSender(address [common.AddressLength]byte, hashTxn common.Ha
 		acc.TransactionsSender = []common.Hash{hashTxn}
 	}
 	Accounts.AllAccounts[address] = acc
+	AccountsRWMutex.Unlock()
 }
 
 func AddTransactionsRecipient(address [common.AddressLength]byte, hashTxn common.Hash) {
 	AccountsRWMutex.Lock()
-	defer AccountsRWMutex.Unlock()
+
 	var isOK bool
 	var acc Account
 	if acc, isOK = Accounts.AllAccounts[address]; !isOK {
+		AccountsRWMutex.Unlock()
 		SetAccountByAddressBytes(address[:])
+		AccountsRWMutex.Lock()
 	}
 	// acc := Accounts.AllAccounts[address]
 	if acc.TransactionsRecipient != nil {
@@ -50,6 +54,7 @@ func AddTransactionsRecipient(address [common.AddressLength]byte, hashTxn common
 		acc.TransactionsRecipient = []common.Hash{hashTxn}
 	}
 	Accounts.AllAccounts[address] = acc
+	AccountsRWMutex.Unlock()
 }
 
 // error is not checked one should do the checking before
