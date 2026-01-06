@@ -43,43 +43,43 @@ func OnMessage(addr [4]byte, m []byte) {
 			logger.GetLogger().Println("no more transactions can be accepted to the pool")
 			return
 		}
-		if common.IsMiner.Load() {
-			// need to check transactions
-			for _, v := range txn {
-				for _, t := range v {
-					if transactionsPool.PoolsTx.TransactionExists(t.Hash.GetBytes()) {
-						//logger.GetLogger().Println("transaction just exists in Pool")
-						continue
-					}
-					if transactionsDefinition.CheckFromDBPoolTx(common.TransactionDBPrefix[:], t.Hash.GetBytes()) {
-						logger.GetLogger().Println("transaction just exists in DB")
-						continue
-					}
+		// if common.IsMiner.Load() {
+		// need to check transactions
+		for _, v := range txn {
+			for _, t := range v {
+				if transactionsPool.PoolsTx.TransactionExists(t.Hash.GetBytes()) {
+					//logger.GetLogger().Println("transaction just exists in Pool")
+					continue
+				}
+				if transactionsDefinition.CheckFromDBPoolTx(common.TransactionDBPrefix[:], t.Hash.GetBytes()) {
+					logger.GetLogger().Println("transaction just exists in DB")
+					continue
+				}
 
-					isAdded := transactionsPool.PoolsTx.AddTransaction(t, t.Hash)
-					if isAdded {
-						err := t.StoreToDBPoolTx(common.TransactionPoolHashesDBPrefix[:])
+				isAdded := transactionsPool.PoolsTx.AddTransaction(t, t.Hash)
+				if isAdded {
+					err := t.StoreToDBPoolTx(common.TransactionPoolHashesDBPrefix[:])
+					if err != nil {
+						transactionsPool.PoolsTx.RemoveTransactionByHash(t.Hash.GetBytes())
+						err := transactionsDefinition.RemoveTransactionFromDBbyHash(common.TransactionPoolHashesDBPrefix[:], t.Hash.GetBytes())
 						if err != nil {
-							transactionsPool.PoolsTx.RemoveTransactionByHash(t.Hash.GetBytes())
-							err := transactionsDefinition.RemoveTransactionFromDBbyHash(common.TransactionPoolHashesDBPrefix[:], t.Hash.GetBytes())
-							if err != nil {
-								logger.GetLogger().Println(err)
-							}
 							logger.GetLogger().Println(err)
-							continue
 						}
-						if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
-							//maybe we should not broadcast automatically transactions. Third party should care about it
-							BroadcastTxn(addr, m)
-							logger.GetLogger().Print("Broadcasting txn")
-						}
+						logger.GetLogger().Println(err)
+						continue
+					}
+					if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
+						//maybe we should not broadcast automatically transactions. Third party should care about it
+						BroadcastTxn(addr, m)
+						logger.GetLogger().Print("Broadcasting txn")
 					}
 				}
 			}
-		} else {
-			BroadcastTxn(addr, m)
-			logger.GetLogger().Print("Broadcasting txn Only")
 		}
+		// } else {
+		// 	BroadcastTxn(addr, m)
+		// 	logger.GetLogger().Print("Broadcasting txn Only")
+		// }
 	case "bx":
 		// transaction in sync
 		msg := amsg.(message.TransactionsMessage)
