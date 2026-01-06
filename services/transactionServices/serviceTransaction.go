@@ -2,8 +2,11 @@ package transactionServices
 
 import (
 	"bytes"
-	"github.com/okuralabs/okura-node/logger"
+	"context"
+	"math/rand"
 	"time"
+
+	"github.com/okuralabs/okura-node/logger"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/message"
@@ -15,11 +18,11 @@ import (
 
 func InitTransactionService() {
 	services.SendMutexTx.Lock()
-	services.SendChanTx = make(chan []byte, 100)
+	services.SendChanTx = make(chan []byte, 5)
 
 	services.SendMutexTx.Unlock()
 	startPublishingTransactionMsg()
-	go broadcastTransactionsMsgInLoop(services.SendChanTx)
+	//go broadcastTransactionsMsgInLoop(services.SendChanTx)
 }
 
 func GenerateTransactionMsg(txs []transactionsDefinition.Transaction, mesgHead []byte, topic [2]byte) (message.TransactionsMessage, error) {
@@ -63,7 +66,7 @@ Q:
 		topic := [2]byte{'T', 'T'}
 
 		if SendTransactionMsg(tcpip.MyIP, topic) {
-			break
+			//logger.GetLogger().Println("broadcastTransactionsMsgInLoop: Sent transaction")
 		}
 
 		timeout := time.After(time.Second)
@@ -71,6 +74,7 @@ Q:
 		select {
 		case s := <-chanRecv:
 			if len(s) == 4 && bytes.Equal(s, []byte("EXIT")) {
+				logger.GetLogger().Println("broadcastTransactionsMsgInLoop: EXIT")
 				break Q
 			}
 		case <-timeout:
@@ -84,10 +88,10 @@ Q:
 }
 
 func SendTransactionMsg(ip [4]byte, topic [2]byte) bool {
-	isync := common.IsSyncing.Load()
-	if isync == true {
-		return true
-	}
+	//isync := common.IsSyncing.Load()
+	//if isync == true {
+	//	return true
+	//}
 	txs := transactionsPool.PoolsTx.PeekTransactions(int(common.MaxTransactionsPerBlock), 0)
 	n, err := GenerateTransactionMsg(txs, []byte("tx"), topic)
 	if err != nil {
@@ -96,6 +100,7 @@ func SendTransactionMsg(ip [4]byte, topic [2]byte) bool {
 	}
 	if !Send(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send standard transaction")
+		//time.Sleep(2000 * time.Millisecond)
 		return false
 	}
 	return true
@@ -109,41 +114,122 @@ func SendGT(ip [4]byte, txsHashes [][]byte, syncPre string) {
 	}
 	if !Send(ip, transactionMsg.GetBytes()) {
 		logger.GetLogger().Println("could not send send transaction in GT message")
+		//time.Sleep(2000 * time.Millisecond)
 	}
 }
 
 func Send(addr [4]byte, nb []byte) bool {
-
 	nb = append(addr[:], nb...)
-	if services.SendMutexTx.TryLock() {
-		defer services.SendMutexTx.Unlock()
-		services.SendChanTx <- nb
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
+	services.SendMutexTx.Lock()
+	defer services.SendMutexTx.Unlock()
+	defer cancel()
+	select {
+	case services.SendChanTx <- nb:
 		return true
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
+		return false
 	}
-	return false
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexTx.Lock()
+// 		defer services.SendMutexTx.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanTx <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	lockChan := make(chan struct{}, 1)
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+// 	services.SendMutexTx.Lock()
+// 	defer services.SendMutexTx.Unlock()
+// 	go func() {
+// 		// Check if context is still valid
+// 		select {
+// 		case <-ctx.Done():
+// 			// Timeout occurred, we need to unlock and exit
+// 			services.SendMutexTx.Unlock()
+// 			return
+// 		case lockChan <- struct{}{}:
+// 			// Successfully notified, don't unlock here
+// 		}
+// 	}()
+
+// 	select {
+// 	case <-lockChan:
+// 		select {
+// 		case services.SendChanTx <- nb:
+// 			return true
+// 		default:
+// 			//services.PurgeChannel(services.SendChanTx, 3)
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		// The goroutine will handle unlocking if it got the lock
+// 		return false
+// 	}
+// }
 
 func BroadcastTxn(ignoreAddr [4]byte, nb []byte) {
 	var ip [4]byte
 	var peers = tcpip.GetPeersConnected(tcpip.TransactionTopic)
-	//num_peers := len(peers)
+	num_peers := len(peers)
 	for topicip, _ := range peers {
 		// trying to send randomly to 1 other nodes
-		//if rand.Intn(num_peers) >= 1 {
-		//	continue
-		//}
+		if !bytes.Equal(ignoreAddr[:], []byte{0, 0, 0, 0}) || rand.Intn(num_peers) >= 1 {
+			continue
+		}
 		copy(ip[:], topicip[2:])
 		if !bytes.Equal(ip[:], ignoreAddr[:]) && !bytes.Equal(ip[:], tcpip.MyIP[:]) {
 			//logger.GetLogger().Println("send transactions to ", int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
 			if !Send(ip, nb) {
 				logger.GetLogger().Println("could not broadcast transaction")
+				//time.Sleep(time.Millisecond * 2000)
 			}
 		}
 	}
 }
 
 func startPublishingTransactionMsg() {
-	go tcpip.StartNewListener(services.SendChanTx, tcpip.TransactionTopic)
+	go tcpip.StartNewListener(tcpip.TransactionTopic)
+	go tcpip.LoopSend(services.SendChanTx, tcpip.TransactionTopic)
 }
 
 func StartSubscribingTransactionMsg(ip [4]byte) {
@@ -170,8 +256,8 @@ func StartSubscribingTransactionMsg(ip [4]byte) {
 		case <-tcpip.Quit:
 			logger.GetLogger().Printf("Received quit signal for peer %v", ip)
 			services.QUIT.Store(true)
-		default:
-			time.Sleep(time.Millisecond * 100) // Reduced sleep time
+			// default:
+			// time.Sleep(time.Millisecond * 100) // Reduced sleep time
 		}
 	}
 	logger.GetLogger().Println("Exiting transaction message receiving loop for peer:", ip)

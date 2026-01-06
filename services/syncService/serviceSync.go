@@ -2,18 +2,20 @@ package syncServices
 
 import (
 	"bytes"
+	"context"
+	"time"
+
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/message"
 	"github.com/okuralabs/okura-node/services"
 	"github.com/okuralabs/okura-node/tcpip"
-	"time"
 )
 
 func InitSyncService() {
 	services.SendMutexSync.Lock()
-	services.SendChanSync = make(chan []byte, 100)
+	services.SendChanSync = make(chan []byte, 5)
 
 	services.SendMutexSync.Unlock()
 	startPublishingSyncMsg()
@@ -134,28 +136,117 @@ func SendGetHeaders(addr [4]byte, height int64) {
 	}
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	services.SendMutexSync.Lock()
+// 	defer services.SendMutexSync.Unlock()
+
+// 	select {
+// 	case services.SendChanSync <- nb:
+// 		return true
+// 	default:
+// 		return false
+// 	}
+// }
+
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexSync.TryLock() {
-		defer services.SendMutexSync.Unlock()
-		services.SendChanSync <- nb
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
+	services.SendMutexSync.Lock()
+	defer services.SendMutexSync.Unlock()
+	defer cancel()
+	select {
+	case services.SendChanSync <- nb:
 		return true
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
+		return false
 	}
-	return false
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 10000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexSync.Lock()
+// 		defer services.SendMutexSync.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanSync <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	// Próba zdobycia locka z timeoutem
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexSync.Lock()
+// 		close(lockChan)
+// 	}()
+
+// 	select {
+// 	case <-lockChan:
+// 		defer services.SendMutexSync.Unlock()
+
+// 		select {
+// 		case services.SendChanSync <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
+
 func sendSyncMsgInLoop() {
-	for range time.Tick(time.Second) {
+	for {
 		n := generateSyncMsgHeight()
 		if !Send([4]byte{0, 0, 0, 0}, n) {
 			logger.GetLogger().Println("could not send 'hi' message")
+			//time.Sleep(time.Millisecond * 2000)
 		}
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 
 func startPublishingSyncMsg() {
 
-	go tcpip.StartNewListener(services.SendChanSync, tcpip.SyncTopic)
+	go tcpip.StartNewListener(tcpip.SyncTopic)
+	go tcpip.LoopSend(services.SendChanSync, tcpip.SyncTopic)
 }
 
 func StartSubscribingSyncMsg(ip [4]byte) {
@@ -178,9 +269,9 @@ func StartSubscribingSyncMsg(ip [4]byte) {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (sync msg)", ip)

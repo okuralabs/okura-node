@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/database"
 	"github.com/okuralabs/okura-node/logger"

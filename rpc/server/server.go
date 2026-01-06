@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/rpc"
+	"strconv"
+	"sync"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
@@ -19,10 +24,6 @@ import (
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/transactionsPool"
 	"github.com/okuralabs/okura-node/wallet"
-	"net"
-	"net/rpc"
-	"strconv"
-	"sync"
 )
 
 var listenerMutex sync.Mutex
@@ -47,7 +48,7 @@ func ListenRPC() {
 
 func (l *Listener) Send(lineBeg []byte, reply *[]byte) error {
 	listenerMutex.Lock()
-
+	defer listenerMutex.Unlock()
 	if len(lineBeg) < 4 {
 		*reply = []byte("Error with message. Too small length calling server")
 		return nil
@@ -93,10 +94,12 @@ func (l *Listener) Send(lineBeg []byte, reply *[]byte) error {
 			return nil
 		}
 	}
-	listenerMutex.Unlock()
+
 	switch operation {
 	case "STAT":
 		handleSTAT(byt, reply)
+	case "POOL":
+		handlePOOL(byt, reply)
 	case "WALL":
 		handleWALL(byt, reply)
 	case "TRAN":
@@ -144,6 +147,31 @@ func handleWALL(line []byte, reply *[]byte) {
 		return
 	}
 	*reply = r
+}
+
+func handlePOOL(line []byte, reply *[]byte) {
+	logger.GetLogger().Println(string(line))
+
+	txs := transactionsPool.PoolsTx.PeekTransactions(int(common.MaxTransactionsPerBlock), 0)
+	txs0 := ""
+	for i, tx := range txs {
+		txs0 += fmt.Sprint(i) + ": " + tx.GetString()
+
+	}
+	txs = transactionsPool.PoolsTx.PeekTransactions(int(common.MaxTransactionsPerBlock), 1)
+	txs1 := ""
+	for i, tx := range txs {
+		txs1 += fmt.Sprint(i) + ": " + tx.GetString()
+
+	}
+	txs = transactionsPool.PoolsTx.PeekTransactions(int(common.MaxTransactionsPerBlock), 2)
+	txs2 := ""
+	for i, tx := range txs {
+		txs2 += fmt.Sprint(i) + ": " + tx.GetString()
+
+	}
+
+	*reply = []byte("Pending transactions:\n" + txs0 + "\n\n" + "Escrow Transactions:\n" + txs1 + "\n\n" + "MultiSig Transactions:\n" + txs2)
 }
 
 func handleCHECK(line []byte, reply *[]byte) {
@@ -367,7 +395,7 @@ func handleACCT(line []byte, reply *[]byte) {
 	copy(byt[:], line[:common.AddressLength])
 	account.AccountsRWMutex.RLock()
 	acc := account.Accounts.AllAccounts[byt]
-	defer account.AccountsRWMutex.RUnlock()
+	account.AccountsRWMutex.RUnlock()
 	am := acc.Marshal()
 	logger.GetLogger().Println("am len data", len(am))
 	*reply = am

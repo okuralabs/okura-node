@@ -1,6 +1,8 @@
 package transactionServices
 
 import (
+	"bytes"
+
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/message"
@@ -30,46 +32,53 @@ func OnMessage(addr [4]byte, m []byte) {
 
 	switch string(amsg.GetHead()) {
 	case "tx":
+
 		msg := amsg.(message.TransactionsMessage)
 		txn, err := msg.GetTransactionsFromBytes(common.SigName(), common.SigName2(), common.IsPaused(), common.IsPaused2())
 		if err != nil {
 			return
 		}
-		logger.GetLogger().Println("get tx from ", addr[:])
+		//logger.GetLogger().Println("get tx from ", addr[:])
 		if transactionsPool.PoolsTx.NumberOfTransactions() > common.MaxTransactionInPool {
 			logger.GetLogger().Println("no more transactions can be accepted to the pool")
 			return
 		}
-		// need to check transactions
-		for _, v := range txn {
-			for _, t := range v {
-				if transactionsPool.PoolsTx.TransactionExists(t.Hash.GetBytes()) {
-					logger.GetLogger().Println("transaction just exists in Pool")
-					continue
-				}
-				if transactionsDefinition.CheckFromDBPoolTx(common.TransactionDBPrefix[:], t.Hash.GetBytes()) {
-					logger.GetLogger().Println("transaction just exists in DB")
-					continue
-				}
-
-				isAdded := transactionsPool.PoolsTx.AddTransaction(t, t.Hash)
-				if isAdded {
-					err := t.StoreToDBPoolTx(common.TransactionPoolHashesDBPrefix[:])
-					if err != nil {
-						transactionsPool.PoolsTx.RemoveTransactionByHash(t.Hash.GetBytes())
-						err := transactionsDefinition.RemoveTransactionFromDBbyHash(common.TransactionPoolHashesDBPrefix[:], t.Hash.GetBytes())
-						if err != nil {
-							logger.GetLogger().Println(err)
-						}
-						logger.GetLogger().Println(err)
+		if common.IsMiner.Load() {
+			// need to check transactions
+			for _, v := range txn {
+				for _, t := range v {
+					if transactionsPool.PoolsTx.TransactionExists(t.Hash.GetBytes()) {
+						//logger.GetLogger().Println("transaction just exists in Pool")
 						continue
 					}
-					if !common.IsSyncing.Load() {
-						//maybe we should not broadcast automatically transactions. Third party should care about it
-						BroadcastTxn(addr, m)
+					if transactionsDefinition.CheckFromDBPoolTx(common.TransactionDBPrefix[:], t.Hash.GetBytes()) {
+						logger.GetLogger().Println("transaction just exists in DB")
+						continue
+					}
+
+					isAdded := transactionsPool.PoolsTx.AddTransaction(t, t.Hash)
+					if isAdded {
+						err := t.StoreToDBPoolTx(common.TransactionPoolHashesDBPrefix[:])
+						if err != nil {
+							transactionsPool.PoolsTx.RemoveTransactionByHash(t.Hash.GetBytes())
+							err := transactionsDefinition.RemoveTransactionFromDBbyHash(common.TransactionPoolHashesDBPrefix[:], t.Hash.GetBytes())
+							if err != nil {
+								logger.GetLogger().Println(err)
+							}
+							logger.GetLogger().Println(err)
+							continue
+						}
+						if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
+							//maybe we should not broadcast automatically transactions. Third party should care about it
+							// BroadcastTxn(addr, m)
+							logger.GetLogger().Print("Broadcasting txn")
+						}
 					}
 				}
 			}
+		} else {
+			// BroadcastTxn(addr, m)
+			logger.GetLogger().Print("Broadcasting txn Only")
 		}
 	case "bx":
 		// transaction in sync
@@ -83,18 +92,14 @@ func OnMessage(addr [4]byte, m []byte) {
 		for _, v := range txn {
 			for _, t := range v {
 				if transactionsPool.PoolsTx.TransactionExists(t.Hash.GetBytes()) {
-					logger.GetLogger().Println("transaction just exists in Pool")
-					continue
-				}
-				if transactionsDefinition.CheckFromDBPoolTx(common.TransactionDBPrefix[:], t.Hash.GetBytes()) {
-					logger.GetLogger().Println("transaction just exists in DB")
+					//logger.GetLogger().Println("transaction just exists in Pool. bx")
 					continue
 				}
 
 				isAdded := transactionsPool.PoolsTx.AddTransaction(t, t.Hash)
 				if isAdded {
-					logger.GetLogger().Println("transactions added to pool bx")
-					err := t.StoreToDBPoolTx(common.TransactionDBPrefix[:])
+					//logger.GetLogger().Println("transactions added to pool bx")
+					err := t.StoreToDBPoolTx(common.TransactionPoolHashesDBPrefix[:])
 					if err != nil {
 						transactionsPool.PoolsTx.RemoveTransactionByHash(t.Hash.GetBytes())
 						err := transactionsDefinition.RemoveTransactionFromDBbyHash(common.TransactionDBPrefix[:], t.Hash.GetBytes())

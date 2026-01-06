@@ -3,12 +3,13 @@ package qtwidgets
 import (
 	"bytes"
 	"fmt"
+	"os"
+
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	clientrpc "github.com/okuralabs/okura-node/rpc/client"
 	"github.com/okuralabs/okura-node/wallet"
-	"os"
 )
 
 func SignMessage(line []byte) []byte {
@@ -49,6 +50,8 @@ func SignMessage(line []byte) []byte {
 	} else {
 		line = common.BytesToLenAndBytes(line)
 	}
+	// ip := net.IP(tcpip.MyIP[:]).String()
+	go clientrpc.ConnectRPC("127.0.0.1")
 	return line
 }
 

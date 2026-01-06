@@ -3,6 +3,7 @@ package blocks
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -15,9 +16,14 @@ var ZerosHash = make([]byte, common.HashLength)
 func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount int64, sumFee int64) bool {
 	fee := tx.GasPrice * tx.GasUsage
 	amount := tx.TxData.Amount
-	address := tx.GetSenderAddress()
+	address := tx.TxParam.Sender
+	addressRecipient := tx.TxData.Recipient
+
+	// account.SetAccountByAddressBytes(addressRecipient.ByteValue[:])
+	account.AddTransactionsRecipient(addressRecipient.ByteValue, tx.GetHash())
 	acc, exist := account.GetAccountByAddressBytes(address.GetBytes())
-	if !exist || !bytes.Equal(acc.Address[:], address.GetBytes()) {
+	// || !bytes.Equal(acc.Address[:], address.GetBytes())
+	if !exist {
 		logger.GetLogger().Println("no account found in check staking transaction: CheckStakingTransaction")
 		return false
 	}
@@ -29,7 +35,7 @@ func CheckStakingTransaction(tx transactionsDefinition.Transaction, sumAmount in
 		logger.GetLogger().Println("not enough funds on account to cover sumFee: CheckStakingTransaction")
 		return false
 	}
-	addressRecipient := tx.TxData.Recipient
+
 	var err error
 	var n int
 	if tx.GetLockedAmount() > 0 {
@@ -154,6 +160,7 @@ func ProcessTransaction(tx transactionsDefinition.Transaction, height int64) err
 	account.AddTransactionsSender(address.ByteValue, tx.GetHash())
 	addressRecipient := tx.TxData.Recipient
 	account.AddTransactionsRecipient(addressRecipient.ByteValue, tx.GetHash())
+
 	var err error
 	var n int
 	if tx.GetLockedAmount() > 0 {
@@ -271,7 +278,7 @@ func ProcessTransaction(tx transactionsDefinition.Transaction, height int64) err
 	return nil
 }
 
-func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height int64) error {
+func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height int64, tree *transactionsPool.MerkleTree) error {
 
 	if bytes.Equal(tx.TxParam.MultiSignTx.GetBytes(), ZerosHash) {
 		return nil
@@ -359,7 +366,7 @@ func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height 
 			err = AddBalance(address.ByteValue, -amount)
 			if err != nil {
 				// this can happen very rare. Only when escrow is multisign account
-				transactionsPool.RemoveBadTransactionByHash(mainTx.Hash.GetBytes(), height)
+				transactionsPool.RemoveBadTransactionByHash(mainTx.Hash.GetBytes(), height, tree)
 				return err
 			}
 
@@ -373,7 +380,7 @@ func ProcessTransactionsMultiSign(tx transactionsDefinition.Transaction, height 
 	return nil
 }
 
-func ProcessTransactionsEscrow(height int64) error {
+func ProcessTransactionsEscrow(height int64, tree *transactionsPool.MerkleTree) error {
 
 	txs := transactionsPool.PoolTxEscrow.PeekTransactions(common.MaxTransactionInPool, height)
 
@@ -413,7 +420,7 @@ func ProcessTransactionsEscrow(height int64) error {
 				err = AddBalance(address.ByteValue, -amount)
 				if err != nil {
 					// this can happen very rare. Only when escrow is multisign account
-					transactionsPool.RemoveBadTransactionByHash(tx.Hash.GetBytes(), height)
+					transactionsPool.RemoveBadTransactionByHash(tx.Hash.GetBytes(), height, tree)
 					return err
 				}
 
