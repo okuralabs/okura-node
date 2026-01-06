@@ -2,11 +2,13 @@ package qtwidgets
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/okuralabs/okura-node/common"
+	"github.com/okuralabs/okura-node/logger"
 	clientrpc "github.com/okuralabs/okura-node/rpc/client"
 	"github.com/okuralabs/okura-node/wallet"
 	"github.com/therecipe/qt/widgets"
-	"strconv"
 )
 
 var err error
@@ -73,7 +75,9 @@ func ShowWalletPage() *widgets.QTabWidget {
 			widgets.QMessageBox_Information(nil, "error", info, widgets.QMessageBox__Ok, widgets.QMessageBox__Ok)
 			return
 		}
-
+		logger.GetLogger().Println("PubKey1: ", MainWallet.Account1.PublicKey.GetHex())
+		logger.GetLogger().Println("PubKey2: ", MainWallet.Account2.PublicKey.GetHex())
+		logger.GetLogger().Println("Address: ", MainWallet.MainAddress.GetHex())
 		if MainWallet.GetSigName(true) != common.SigName() {
 			widgets.QMessageBox_Information(nil, "Warning", "primary encryption has changed. You need to update wallet", widgets.QMessageBox__Ok, widgets.QMessageBox__Ok)
 		}

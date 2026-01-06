@@ -221,6 +221,7 @@ func CheckBlockTransfers(block Block, lastBlock Block, tree *transactionsPool.Me
 			stakingAccounts[stakingAcc.Address] = stakingAcc
 			ret := CheckStakingTransaction(poolTx, stakingAccounts[stakingAcc.Address].StakedBalance, stakingAccounts[stakingAcc.Address].StakingRewards)
 			if ret == false {
+				logger.GetLogger().Println("CheckStakingTransaction fails")
 				// remove bad transaction from pool
 				transactionsPool.RemoveBadTransactionByHash(poolTx.Hash.GetBytes(), block.GetHeader().Height, tree, ban)
 				return 0, 0, fmt.Errorf("staking transactions checking fails: CheckBlockTransfers")
