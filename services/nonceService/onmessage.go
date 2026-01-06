@@ -2,8 +2,9 @@ package nonceServices
 
 import (
 	"bytes"
-	"github.com/okuralabs/okura-node/logger"
 	"runtime/debug"
+
+	"github.com/okuralabs/okura-node/logger"
 
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
@@ -20,9 +21,9 @@ import (
 )
 
 func OnMessage(addr [4]byte, m []byte) {
-	if common.IsSyncing.Load() {
-		return
-	}
+	//if common.IsSyncing.Load() {
+	//	return
+	//}
 
 	h := common.GetHeight()
 
@@ -161,10 +162,15 @@ func OnMessage(addr [4]byte, m []byte) {
 
 		}
 
+		if n2, err := account.IntDelegatedAccountFromAddress(common.GetDelegatedAccount()); err == nil && n2 == n {
+			common.IsMiner.Store(true)
+			logger.GetLogger().Println("I am the miner")
+		}
+
 		if newBlock.CheckProofOfSynergy() {
-			_, _, err := blocks.CheckBlockTransfers(newBlock, lastBlock, false)
+			_, _, err := blocks.CheckBlockTransfers(newBlock, lastBlock, merkleTrie, false)
 			if err == nil {
-				services.BroadcastBlock(newBlock)
+				services.BroadcastBlock(addr, newBlock)
 			} else {
 				logger.GetLogger().Println("new block is not valid. Bad transactions included")
 			}
@@ -221,7 +227,7 @@ func OnMessage(addr [4]byte, m []byte) {
 				}
 				hashesMissing := blocks.IsAllTransactions(newBlock)
 				if len(hashesMissing) > 0 {
-					transactionServices.SendGT(addr, hashesMissing, "st")
+					transactionServices.SendGT(addr, hashesMissing, "bt")
 					return
 				}
 

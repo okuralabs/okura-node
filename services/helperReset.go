@@ -1,15 +1,31 @@
 package services
 
 import (
+	"sync/atomic"
+	"time"
+
 	"github.com/okuralabs/okura-node/account"
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 	"github.com/okuralabs/okura-node/transactionsPool"
-	"sync/atomic"
 )
 
 var QUIT = atomic.Bool{}
+
+func PurgeChannel(ch chan []byte, count int) {
+	logger.GetLogger().Println("Purging channel")
+	time.Sleep(time.Second * time.Duration(count))
+	//for range count {
+	//	select {
+	//	case <-ch:
+	//		// Discard the message
+	//	default:
+	//		// Channel is empty, done purging
+	//		return
+	//	}
+	//}
+}
 
 func init() {
 	QUIT.Store(false)

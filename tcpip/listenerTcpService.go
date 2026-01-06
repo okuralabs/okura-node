@@ -3,17 +3,17 @@ package tcpip
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net"
-	"syscall"
 	"time"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
 )
 
-func StartNewListener(sendChan <-chan []byte, topic [2]byte) {
+var ChanPeer = make(chan []byte)
+
+func StartNewListener(topic [2]byte) {
 
 	conn, err := Listen([4]byte{0, 0, 0, 0}, Ports[topic])
 	if err != nil {
@@ -27,11 +27,10 @@ func StartNewListener(sendChan <-chan []byte, topic [2]byte) {
 			tcpConn.Close()
 		}
 	}()
-	go LoopSend(sendChan, topic)
 	for {
 		select {
 		case <-Quit:
-			return
+			logger.GetLogger().Println("Should exit StartNewListener")
 		default:
 			_, err := Accept(topic, conn)
 			if err != nil {
@@ -50,10 +49,10 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 			if len(s) > 4 {
 				copy(ipr[:], s[:4])
 			} else {
-				logger.GetLogger().Println("wrong message")
+				logger.GetLogger().Println("wrong message", topic)
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 
 			PeersMutex.Lock()
 			select {
@@ -78,9 +77,15 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 						} else if !bytes.Equal(k[:], MyIP[:]) {
 							//logger.GetLogger().Println("send to ipr", k)
 							err := Send(tcpConn0, s[4:])
-							if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) {
+							if err != nil {
 								logger.GetLogger().Println("error in sending to all ", err)
-								CloseAndRemoveConnection(tcpConn0)
+								deletedIP := CloseAndRemoveConnection(tcpConn0)
+								PeersMutex.Unlock()
+								cancel()
+								for _, dc := range deletedIP {
+									ChanPeer <- dc
+								}
+								continue
 							}
 						}
 					}
@@ -97,9 +102,16 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 					} else if ok {
 						//logger.GetLogger().Println("send to ip", ipr)
 						err := Send(tcpConn, s[4:])
-						if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) {
+						if err != nil {
 							logger.GetLogger().Println("error in sending to ", ipr, err)
-							CloseAndRemoveConnection(tcpConn)
+							deletedIP := CloseAndRemoveConnection(tcpConn)
+
+							for _, dc := range deletedIP {
+								ChanPeer <- dc
+							}
+							PeersMutex.Unlock()
+							cancel()
+							continue
 						}
 					} else {
 						//fmt.Println("no connection to given ip", ipr, topic)
@@ -110,13 +122,12 @@ func LoopSend(sendChan <-chan []byte, topic [2]byte) {
 				PeersMutex.Unlock()
 				cancel()
 			}
-		case b := <-waitChan:
-			if bytes.Equal(b, topic[:]) {
-				time.Sleep(time.Millisecond * 10)
-			}
+		//case b := <-waitChan:
+		//	if bytes.Equal(b, topic[:]) {
+		//		time.Sleep(time.Millisecond * 10)
+		//	}
 		case <-Quit:
-			return
-		default:
+			logger.GetLogger().Println("Should exit LoopSend")
 		}
 	}
 }
@@ -167,15 +178,19 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 	}
 
 	reconnectionTries := 0
-	resetNumber := 0
+	//resetNumber := 0
 
 	defer func() {
 		if r := recover(); r != nil {
 			logger.GetLogger().Printf("Recovered from panic in connection to %v: %v", ip, r)
 			receiveChan <- []byte("EXIT")
 			PeersMutex.Lock()
-			defer PeersMutex.Unlock()
-			CloseAndRemoveConnection(tcpConn)
+			deletedIP := CloseAndRemoveConnection(tcpConn)
+
+			for _, dc := range deletedIP {
+				ChanPeer <- dc
+			}
+			PeersMutex.Unlock()
 		}
 	}()
 
@@ -184,18 +199,21 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 	rTopic := map[[2]byte][]byte{}
 
 	for {
-		resetNumber++
-		if resetNumber%100 == 0 {
-			reconnectionTries = 0
-		}
+		//resetNumber++
+		//if resetNumber%1000 == 0 {
+		//	reconnectionTries = 0
+		//}
 
 		select {
 		case <-Quit:
 			logger.GetLogger().Printf("Received quit signal for connection to %v", ip)
-			receiveChan <- []byte("EXIT")
 			PeersMutex.Lock()
-			defer PeersMutex.Unlock()
-			CloseAndRemoveConnection(tcpConn)
+			deletedIP := CloseAndRemoveConnection(tcpConn)
+
+			for _, dc := range deletedIP {
+				ChanPeer <- dc
+			}
+			PeersMutex.Unlock()
 			return
 		default:
 			r := Receive(topic, tcpConn)
@@ -204,32 +222,48 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 			}
 			if bytes.Equal(r, []byte("<-ERR->")) {
 				if reconnectionTries > common.ConnectionMaxTries {
+
+					logger.GetLogger().Println("Closing connection", ip, r)
+					PeersMutex.Lock()
+					receiveChan <- []byte("EXIT")
+					deletedIP := CloseAndRemoveConnection(tcpConn)
+
+					for _, dc := range deletedIP {
+						ChanPeer <- dc
+					}
+					reconnectionTries = 0
+					PeersMutex.Unlock()
+					return
+				}
+				if reconnectionTries%10 == 9 {
 					logger.GetLogger().Println("error in read. Closing connection", ip, string(r))
 					tcpConn.Close()
 					tcpConn, err = net.DialTCP("tcp", nil, tcpAddr)
 					if err != nil {
 						logger.GetLogger().Printf("Connection attempt %d to %s failed: %v", ipport, err.Error())
 					}
-					reconnectionTries = 0
-					continue
 				}
 				reconnectionTries++
 				time.Sleep(time.Millisecond * 10)
 				continue
 			}
-			if bytes.Equal(r, []byte("<-CLS->")) || bytes.Equal(r, []byte("QUITFOR")) {
+			if bytes.Equal(r, []byte("<-CLS->")) {
 
 				logger.GetLogger().Println("Closing connection", ip, r)
-				receiveChan <- []byte("EXIT")
 				PeersMutex.Lock()
-				defer PeersMutex.Unlock()
-				CloseAndRemoveConnection(tcpConn)
+				receiveChan <- []byte("EXIT")
+				deletedIP := CloseAndRemoveConnection(tcpConn)
+				for _, dc := range deletedIP {
+					ChanPeer <- dc
+				}
+				PeersMutex.Unlock()
 				return
+
 			}
-			if bytes.Equal(r, []byte("WAIT")) {
-				waitChan <- topic[:]
-				continue
-			}
+			//if bytes.Equal(r, []byte("WAIT")) {
+			//	waitChan <- topic[:]
+			//	continue
+			//}
 
 			rt, ok := rTopic[topic]
 			if ok {
@@ -245,13 +279,15 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 				logger.GetLogger().Println("error: too long message received: ", len(r))
 				PeersMutex.Lock()
 				ReduceTrustRegisterPeer(ip)
-				PeersMutex.Unlock()
+
 				rTopic[topic] = []byte{}
 				if trust, ok := validPeersConnected[ip]; ok && trust <= 0 {
+					PeersMutex.Unlock()
 					BanIP(ip)
 					receiveChan <- []byte("EXIT")
 					return
 				}
+				PeersMutex.Unlock()
 				continue
 			}
 			if bytes.Equal(r[len(r)-7:], []byte("<-END->")) {
@@ -262,12 +298,14 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 						logger.GetLogger().Println("wrong MessageInitialization", r[:4], "should be", common.MessageInitialization[:])
 						PeersMutex.Lock()
 						ReduceTrustRegisterPeer(ip)
-						PeersMutex.Unlock()
+
 						if trust, ok := validPeersConnected[ip]; ok && trust <= 0 {
+							PeersMutex.Unlock()
 							BanIP(ip)
 							receiveChan <- []byte("EXIT")
 							return
 						}
+						PeersMutex.Unlock()
 					}
 				}
 			}
@@ -275,24 +313,28 @@ func StartNewConnection(ip [4]byte, receiveChan chan []byte, topic [2]byte) {
 	}
 }
 
-func CloseAndRemoveConnection(tcpConn *net.TCPConn) {
+func CloseAndRemoveConnection(tcpConn *net.TCPConn) [][]byte {
 	if tcpConn == nil {
-		return
+		return [][]byte{}
 	}
 
 	topicipBytes := [6]byte{}
 	// Method 2: Compare TCP addresses directly (more robust)
-	targetTCPAddr := tcpConn.RemoteAddr().(*net.TCPAddr)
-
+	remoteAddr := tcpConn.RemoteAddr().(*net.TCPAddr)
+	localAddr := tcpConn.LocalAddr().(*net.TCPAddr)
+	deletedIP := [][]byte{}
 	// Find and remove the connection
 	for topic, connections := range tcpConnections {
 		for peerIP, conn := range connections {
+			rTCPAddr, ok := conn.RemoteAddr().(*net.TCPAddr)
+			lTCPAddr, ok2 := conn.LocalAddr().(*net.TCPAddr)
 			// Using direct TCP address comparison for more robust matching
-			if connTCPAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-				if connTCPAddr.IP.Equal(targetTCPAddr.IP) && connTCPAddr.Port == targetTCPAddr.Port {
+			if ok && ok2 {
+				if (rTCPAddr.IP.Equal(remoteAddr.IP) || lTCPAddr.IP.Equal(remoteAddr.IP)) && (rTCPAddr.Port == localAddr.Port || lTCPAddr.Port == localAddr.Port || rTCPAddr.Port == remoteAddr.Port || lTCPAddr.Port == remoteAddr.Port) {
 					fmt.Printf("Closing connection for topic %v, peer %v (IP: %v, Port: %d)\n",
-						topic, peerIP, targetTCPAddr.IP, targetTCPAddr.Port)
+						topic, peerIP, remoteAddr.IP, remoteAddr.Port)
 
+					deletedIP = append(deletedIP, append(topic[:], peerIP[:]...))
 					fmt.Println("Closing connection (send)", topic, peerIP)
 					tcpConnections[topic][peerIP].Close()
 					copy(topicipBytes[:], append(topic[:], peerIP[:]...))
@@ -303,4 +345,5 @@ func CloseAndRemoveConnection(tcpConn *net.TCPConn) {
 			}
 		}
 	}
+	return deletedIP
 }

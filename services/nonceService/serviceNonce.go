@@ -2,6 +2,10 @@ package nonceServices
 
 import (
 	"bytes"
+	"context"
+	"sync"
+	"time"
+
 	"github.com/okuralabs/okura-node/blocks"
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -13,8 +17,6 @@ import (
 	"github.com/okuralabs/okura-node/voting"
 	"github.com/okuralabs/okura-node/wallet"
 	"golang.org/x/exp/rand"
-	"sync"
-	"time"
 )
 
 var LastRepliedIP [4]byte
@@ -76,10 +78,11 @@ func InitChannelVoting(voteChan chan []byte) {
 
 func InitNonceService() {
 	services.SendMutexNonce.Lock()
-	services.SendChanNonce = make(chan []byte, 10)
-
-	services.SendChanSelfNonce = make(chan []byte, 10)
+	services.SendChanNonce = make(chan []byte, 5)
 	services.SendMutexNonce.Unlock()
+	services.SendMutexNonceSelf.Lock()
+	services.SendChanSelfNonce = make(chan []byte, 5)
+	services.SendMutexNonceSelf.Unlock()
 	startPublishingNonceMsg()
 	time.Sleep(time.Second)
 	go sendNonceMsgInLoop()
@@ -176,8 +179,8 @@ func generateNonceMsg(topic [2]byte) (message.TransactionsMessage, error) {
 func sendNonceMsgInLoopSelf(chanRecv chan []byte) {
 	var topic = [2]byte{'S', 'S'}
 Q:
-	for range time.Tick(time.Second) {
-		sendNonceMsg(tcpip.MyIP, topic)
+	for {
+		sendSelfNonceMsg(tcpip.MyIP, topic)
 		timeout := time.After(time.Second)
 
 		select {
@@ -191,18 +194,92 @@ Q:
 			// You can break the loop or return from the function here
 			break
 		}
+		//time.Sleep(time.Millisecond * 1000)
 	}
 }
+
+func sendSelfNonceMsg(ip [4]byte, topic [2]byte) {
+	h := common.GetHeight()
+	if h < common.CurrentHeightOfNetwork {
+		return
+	}
+	//isync := common.IsSyncing.Load()
+	//if isync == true {
+	//	return
+	//}
+	n, err := generateNonceMsg(topic)
+	if err != nil {
+		logger.GetLogger().Println(err)
+		return
+	}
+	if !SendSelf(ip, n.GetBytes()) {
+		logger.GetLogger().Println("could not send nonce message")
+		//time.Sleep(time.Millisecond * 2000)
+	}
+}
+
+func SendSelf(addr [4]byte, nb []byte) bool {
+	nb = append(addr[:], nb...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
+	services.SendMutexNonceSelf.Lock()
+	defer services.SendMutexNonceSelf.Unlock()
+	defer cancel()
+	select {
+	case services.SendChanSelfNonce <- nb:
+		return true
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
+		return false
+	}
+}
+
+// func SendSelf(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+
+// 	lockChan := make(chan struct{})
+// 	go func() {
+// 		services.SendMutexNonceSelf.Lock()
+// 		defer services.SendMutexNonceSelf.Unlock()
+
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case lockChan <- struct{}{}:
+// 		}
+
+// 		<-lockChan // czekaj na sygnał zwolnienia
+// 	}()
+
+// 	select {
+// 	case lockChan <- struct{}{}:
+// 		defer func() { lockChan <- struct{}{} }() // sygnał do zwolnienia locka
+
+// 		select {
+// 		case services.SendChanSelfNonce <- nb:
+// 			return true
+// 		default:
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		logger.GetLogger().Println("Failed to acquire lock within timeout")
+// 		return false
+// 	}
+// }
 
 func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	h := common.GetHeight()
 	if h < common.CurrentHeightOfNetwork {
 		return
 	}
-	isync := common.IsSyncing.Load()
-	if isync == true {
-		return
-	}
+	//isync := common.IsSyncing.Load()
+	//if isync == true {
+	//	return
+	//}
 	n, err := generateNonceMsg(topic)
 	if err != nil {
 		logger.GetLogger().Println(err)
@@ -210,29 +287,89 @@ func sendNonceMsg(ip [4]byte, topic [2]byte) {
 	}
 	if !Send(ip, n.GetBytes()) {
 		logger.GetLogger().Println("could not send nonce message")
+		//time.Sleep(time.Millisecond * 1000)
 	}
 }
+
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	services.SendMutexNonce.Lock()
+// 	defer services.SendMutexNonce.Unlock()
+
+// 	select {
+// 	case services.SendChanNonce <- nb:
+// 		return true
+// 	default:
+// 		return false
+// 	}
+// }
 
 func Send(addr [4]byte, nb []byte) bool {
 	nb = append(addr[:], nb...)
-	if services.SendMutexNonce.TryLock() {
-		defer services.SendMutexNonce.Unlock()
-		services.SendChanNonce <- nb
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+
+	services.SendMutexNonce.Lock()
+	defer services.SendMutexNonce.Unlock()
+	defer cancel()
+	select {
+	case services.SendChanNonce <- nb:
 		return true
+	case <-ctx.Done():
+		logger.GetLogger().Println("Failed to acquire lock within timeout")
+		return false
 	}
-	return false
 }
 
+// func Send(addr [4]byte, nb []byte) bool {
+// 	nb = append(addr[:], nb...)
+
+// 	lockChan := make(chan struct{}, 1)
+// 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+// 	defer cancel()
+// 	services.SendMutexNonce.Lock()
+// 	defer services.SendMutexNonce.Unlock()
+// 	go func() {
+// 		// Check if context is still valid
+// 		select {
+// 		case <-ctx.Done():
+// 			// Timeout occurred, we need to unlock and exit
+// 			return
+// 		case lockChan <- struct{}{}:
+// 			// Successfully notified, don't unlock here
+// 		}
+// 	}()
+
+// 	select {
+// 	case <-lockChan:
+// 		select {
+// 		case services.SendChanNonce <- nb:
+// 			return true
+// 		default:
+// 			//services.PurgeChannel(services.SendChanNonce, 3)
+// 			return false
+// 		}
+// 	case <-ctx.Done():
+// 		log.Println("Failed to acquire lock within timeout")
+// 		// The goroutine will handle unlocking if it got the lock
+// 		return false
+// 	}
+// }
+
 func sendNonceMsgInLoop() {
-	for range time.Tick(time.Second * 5) {
+	for {
 		var topic = [2]byte{'N', 'N'}
 		sendNonceMsg([4]byte{0, 0, 0, 0}, topic)
+		time.Sleep(time.Millisecond * 5000)
 	}
 }
 
 func startPublishingNonceMsg() {
-	go tcpip.StartNewListener(services.SendChanNonce, tcpip.NonceTopic)
-	go tcpip.StartNewListener(services.SendChanSelfNonce, tcpip.SelfNonceTopic)
+	go tcpip.StartNewListener(tcpip.NonceTopic)
+	go tcpip.LoopSend(services.SendChanNonce, tcpip.NonceTopic)
+	go tcpip.StartNewListener(tcpip.SelfNonceTopic)
+	go tcpip.LoopSend(services.SendChanSelfNonce, tcpip.SelfNonceTopic)
 }
 
 func StartSubscribingNonceMsg(ip [4]byte) {
@@ -262,9 +399,9 @@ func StartSubscribingNonceMsg(ip [4]byte) {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (nonce msg)", ip)
@@ -305,10 +442,10 @@ func StartSubscribingNonceMsgSelf() {
 			}
 		case <-tcpip.Quit:
 			services.QUIT.Store(true)
-		default:
+			// default:
 
 			// Optional: Add a small sleep to prevent busy-waiting
-			time.Sleep(time.Millisecond)
+			// time.Sleep(time.Millisecond)
 		}
 	}
 	logger.GetLogger().Println("Exit connection receiving loop (nonce msg self)")

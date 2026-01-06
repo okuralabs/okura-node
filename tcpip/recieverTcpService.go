@@ -26,7 +26,7 @@ var (
 	PeersCount          = 0
 	waitChan            = make(chan []byte)
 	tcpConnections      = make(map[[2]byte]map[[4]byte]*net.TCPConn)
-	PeersMutex          = &sync.RWMutex{}
+	PeersMutex          = sync.RWMutex{}
 	Quit                chan os.Signal
 	TransactionTopic    = [2]byte{'T', 'T'}
 	NonceTopic          = [2]byte{'N', 'N'}
@@ -170,13 +170,13 @@ func Listen(ip [4]byte, port int) (*net.TCPListener, error) {
 func Accept(topic [2]byte, conn *net.TCPListener) (*net.TCPConn, error) {
 	tcpConn, err := conn.AcceptTCP()
 	if err != nil {
-		return nil, fmt.Errorf("error accepting connection: %w", err)
+		return nil, fmt.Errorf("error accepting connection: %v", err.Error())
 	}
 
 	if !RegisterPeer(topic, tcpConn) {
 		tcpConn.Close()
 		FullyDeleteConnection(tcpConn)
-		return nil, fmt.Errorf("error with registration of connection: %w", err)
+		return nil, fmt.Errorf("error with registration of connection: %v", err.Error())
 	}
 	tcpConn.SetKeepAlive(true)
 	return tcpConn, nil
@@ -188,7 +188,7 @@ func Send(conn *net.TCPConn, message []byte) error {
 	message = append(message, []byte("<-END->")...)
 
 	// Set write deadline to 2 seconds
-	conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
+	conn.SetWriteDeadline(time.Now().Add(time.Second))
 
 	_, err := conn.Write(message)
 	if err != nil {
@@ -214,7 +214,6 @@ func Receive(topic [2]byte, conn *net.TCPConn) []byte {
 			return []byte("<-CLS->")
 		}
 		logger.GetLogger().Println("n=", n, "err", err.Error())
-		//handleConnectionError(err, topic, conn)
 		return []byte("<-ERR->")
 	}
 
@@ -302,10 +301,10 @@ func RegisterPeer(topic [2]byte, tcpConn *net.TCPConn) bool {
 			err := existingConn.SetKeepAlivePeriod(time.Duration(rand.Intn(10)) * time.Second)
 			if err != nil {
 				logger.GetLogger().Printf("Error setting keep-alive period. Closing for peer %v on topic %v", ip, topic)
-
+				return false
 			} else {
 				logger.GetLogger().Printf("active existing connection for peer %v on topic %v", ip, topic)
-				return false
+				return true
 			}
 		}
 
@@ -342,30 +341,30 @@ func GetPeersConnected(topic [2]byte) map[[6]byte][2]byte {
 }
 
 func GetIPsConnected() [][]byte {
-	if PeersMutex.TryLock() {
-		defer PeersMutex.Unlock()
-		uniqueIPs := make(map[[4]byte]struct{})
-		for key, value := range nodePeersConnected {
-			if value > 1 {
-				if bytes.Equal(key[:], MyIP[:]) {
-					continue
-				}
-				uniqueIPs[key] = struct{}{}
+	PeersMutex.RLock()
+	defer PeersMutex.RUnlock()
+	uniqueIPs := make(map[[4]byte]struct{})
+	for key, value := range nodePeersConnected {
+		if value > 1 {
+			if bytes.Equal(key[:], MyIP[:]) {
+				continue
 			}
-		}
-		var ips [][]byte
-		for ip := range uniqueIPs {
-			ips = append(ips, ip[:])
-		}
-		PeersCount = len(ips)
-		// return one random peer only
-		if PeersCount > 0 {
-			rn := rand.Intn(PeersCount)
-			return [][]byte{ips[rn]}
-		} else {
-			return [][]byte{}
+			uniqueIPs[key] = struct{}{}
 		}
 	}
+	var ips [][]byte
+	for ip := range uniqueIPs {
+		ips = append(ips, ip[:])
+	}
+	PeersCount = len(ips)
+	// return one random peer only
+	if PeersCount > 0 {
+		rn := rand.Intn(PeersCount)
+		return [][]byte{ips[rn]}
+	} else {
+		return [][]byte{}
+	}
+
 	return [][]byte{}
 }
 
@@ -395,6 +394,6 @@ func LookUpForNewPeersToConnect(chanPeer chan []byte) {
 		}
 		PeersMutex.Unlock()
 
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 1)
 	}
 }

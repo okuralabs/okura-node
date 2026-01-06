@@ -1,6 +1,6 @@
 # Node go OKURA
 
-Works for Ubuntu 22.04 (gcc 11) and go1.23.6
+Works for Ubuntu 24.04 (gcc 11) and go1.23.6
 Only one network interface should be with external public IP
 
 Install prerequisites
@@ -15,6 +15,15 @@ Install prerequisites
     sudo apt install astyle cmake gcc ninja-build libssl-dev python3-pytest python3-pytest-xdist unzip xsltproc doxygen graphviz python3-yaml valgrind
     sudo apt install nano git
     git config --global credential.helper store
+
+Install RocksDB:
+
+    git clone https://github.com/facebook/rocksdb.git
+    cd rocksdb
+    git checkout v10.2.4
+    make shared_lib
+    sudo make install-shared
+    sudo ldconfig
 
 Install OQS library:
 

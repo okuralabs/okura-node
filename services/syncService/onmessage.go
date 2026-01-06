@@ -164,10 +164,12 @@ func OnMessage(addr [4]byte, m []byte) {
 				hashOfMyBlockBytes, err := blocks.LoadHashOfBlock(index)
 				if err != nil {
 					logger.GetLogger().Printf("ERROR: Failed to load block hash for index %d: %v", index, err)
-					defer services.AdjustShiftInPastInReset(hmax)
+
 					common.ShiftToPastMutex.RLock()
-					defer common.ShiftToPastMutex.RUnlock()
+
 					services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+					common.ShiftToPastMutex.RUnlock()
+					services.AdjustShiftInPastInReset(hmax)
 					panic("cannot load block hash")
 				}
 				if bytes.Equal(block.BlockHash.GetBytes(), hashOfMyBlockBytes) {
@@ -176,10 +178,11 @@ func OnMessage(addr [4]byte, m []byte) {
 					continue
 				}
 				logger.GetLogger().Printf("Block hash mismatch at index %d - potential fork detected", index)
-				defer services.AdjustShiftInPastInReset(hmax)
+
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
+				services.AdjustShiftInPastInReset(hmax)
 				panic("potential fork detected")
 			}
 			if was {
@@ -240,10 +243,11 @@ func OnMessage(addr [4]byte, m []byte) {
 
 			if header.Height != index {
 				logger.GetLogger().Printf("ERROR: Height mismatch - Block header height: %d, Expected index: %d", header.Height, index)
-				defer services.AdjustShiftInPastInReset(hmax)
+
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
+				services.AdjustShiftInPastInReset(hmax)
 				panic("not relevant height vs index")
 			}
 
@@ -253,10 +257,11 @@ func OnMessage(addr [4]byte, m []byte) {
 			if err != nil {
 				logger.GetLogger().Printf("ERROR: Base block verification failed for block %d: %v", index, err)
 				tcpip.ReduceAndCheckIfBanIP(addr)
-				services.AdjustShiftInPastInReset(hmax)
+
 				common.ShiftToPastMutex.RLock()
-				defer common.ShiftToPastMutex.RUnlock()
 				services.ResetAccountsAndBlocksSync(index - common.ShiftToPastInReset)
+				common.ShiftToPastMutex.RUnlock()
+				services.AdjustShiftInPastInReset(hmax)
 				panic(err)
 
 			}
@@ -271,7 +276,7 @@ func OnMessage(addr [4]byte, m []byte) {
 			}
 
 		}
-		common.IsSyncing.Store(true)
+		//common.IsSyncing.Store(true)
 		if incompleteTxn {
 			logger.GetLogger().Printf("Sync incomplete - requesting %d missing transactions from peer", len(hashesMissingAll))
 			transactionServices.SendGT(addr, hashesMissingAll, "bt")

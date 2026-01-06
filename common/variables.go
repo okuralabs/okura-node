@@ -1,6 +1,7 @@
 package common
 
 import (
+	"math/rand"
 	"sync"
 	"sync/atomic"
 )
@@ -8,9 +9,17 @@ import (
 var height int64
 var heightMax int64
 var heightMutex sync.RWMutex
+
 var BlockMutex sync.Mutex
-var NonceMutex sync.Mutex
+
+// var NonceMutex sync.Mutex
 var IsSyncing = atomic.Bool{}
+var IsMiner = atomic.Bool{}
+
+func init() {
+	IsSyncing.Store(false)
+	IsMiner.Store(true)
+}
 
 func GetHeight() int64 {
 	heightMutex.RLock()
@@ -27,6 +36,10 @@ func SetHeight(h int64) {
 func GetHeightMax() int64 {
 	heightMutex.RLock()
 	defer heightMutex.RUnlock()
+	r := rand.Intn(4)
+	if r < 1 {
+		heightMax = 0
+	}
 	return heightMax
 }
 

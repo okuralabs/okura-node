@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
-	"github.com/therecipe/qt/widgets"
 	rand2 "math/rand"
 	"sync"
+
+	"github.com/okuralabs/okura-node/cmd/gui/qtwidgets"
+	"github.com/therecipe/qt/widgets"
+
+	"time"
 
 	"github.com/okuralabs/okura-node/common"
 	"github.com/okuralabs/okura-node/logger"
@@ -15,21 +18,19 @@ import (
 	"github.com/okuralabs/okura-node/statistics"
 	"github.com/okuralabs/okura-node/transactionsDefinition"
 	"github.com/okuralabs/okura-node/wallet"
-	"os"
-	"time"
 )
 
 var mutex sync.Mutex
 var MainWallet *wallet.Wallet
 
 func main() {
-	var ip string
-	if len(os.Args) > 1 {
-		ip = os.Args[1]
-	} else {
-		ip = "127.0.0.1"
-	}
-	go clientrpc.ConnectRPC(ip)
+	// var ip string
+	// if len(os.Args) > 1 {
+	// 	ip = os.Args[1]
+	// } else {
+	// 	ip = "127.0.0.1"
+	// }
+	// go clientrpc.ConnectRPC(ip)
 	//fmt.Print("Enter password: ")
 	//password, err := terminal.ReadPassword(0)
 	//if err != nil {
@@ -43,7 +44,7 @@ func main() {
 	wallet.InitActiveWallet(0, string(password), sigName, sigName2)
 	MainWallet = wallet.GetActiveWallet()
 
-	for range 10 {
+	for range 2 {
 		go sendTransactions(MainWallet)
 		//time.Sleep(time.Millisecond * 1)
 	}
@@ -89,6 +90,8 @@ func SignMessage(line []byte) []byte {
 	} else {
 		line = common.BytesToLenAndBytes(line)
 	}
+	// ip := net.IP(tcpip.MyIP[:]).String()
+	go clientrpc.ConnectRPC("127.0.0.1")
 	return line
 }
 
@@ -97,8 +100,8 @@ func SampleTransaction(w *wallet.Wallet) transactionsDefinition.Transaction {
 	defer mutex.Unlock()
 	sender := w.MainAddress
 	recv := common.Address{}
-	br := common.Hex2Bytes("5b21c69aaea1ddd18bd17ad6f23f109479cca304")
-	//br := rand.RandomBytes(20)
+	br := common.Hex2Bytes("5b21c69aaea1ddd18bd17ad6f23f109479cca302")
+	// br := rand.RandomBytes(20)
 	err := recv.Init(append([]byte{0}, br...))
 	if err != nil {
 		return transactionsDefinition.Transaction{}
@@ -179,6 +182,6 @@ func sendTransactions(w *wallet.Wallet) {
 		clientrpc.InRPC <- SignMessage(append([]byte("TRAN"), tmm...))
 		//logger.GetLogger().Printf("send batch %d transactions", batchSize)
 		<-clientrpc.OutRPC
-		//logger.GetLogger().Println("transactions sent")
+		logger.GetLogger().Println("transactions sent")
 	}
 }
