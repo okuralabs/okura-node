@@ -68,11 +68,12 @@ func OnMessage(addr [4]byte, m []byte) {
 						logger.GetLogger().Println(err)
 						continue
 					}
-					if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
-						//maybe we should not broadcast automatically transactions. Third party should care about it
-						BroadcastTxn(addr, m)
-						logger.GetLogger().Print("Broadcasting txn")
-					}
+
+				}
+				if bytes.Equal(addr[:], []byte{0, 0, 0, 0}) || !common.IsSyncing.Load() {
+					//maybe we should not broadcast automatically transactions. Third party should care about it
+					BroadcastTxn(addr, m)
+					logger.GetLogger().Print("Broadcasting txn")
 				}
 			}
 		}
